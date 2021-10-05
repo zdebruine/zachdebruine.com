@@ -1,12 +1,4 @@
-.Rhistory
 .Rproj.user
+.Rhistory
 .RData
 .Ruserdata
-*.zip
-/public/*
-/blogdown/*
-*_cache*
-.httr-oauth
-LondonStageFull.json
-LondonStageJSON.zip
-*.csv
