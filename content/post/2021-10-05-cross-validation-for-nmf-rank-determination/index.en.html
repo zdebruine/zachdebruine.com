@@ -1,12 +1,12 @@
 ---
-title: Cross-validation for NMF rank determination
-author: Zach DeBruine
+title: "Cross-validation for NMF rank determination"
+author: "Zach DeBruine"
 date: '2021-10-05'
-slug: cross-validation-for-nmf
+output: pdf_document
 categories: []
 tags:
-  - NMF
-  - Cross-validation
+- NMF
+- Cross-validation
 subtitle: ''
 summary: ''
 authors: []
@@ -17,26 +17,135 @@ image:
   focal_point: ''
   preview_only: no
 projects: []
+slug: cross-validation-for-nmf
 ---
 
 
 
-<p>Finding the optimal rank for NMF is challenging. Unlike PCA or SVD where interesting factors have high singular values, NMF factors are colinearly optimized.</p>
-<p>Several cross-validation methods for NMF have been proposed, yet here we find only a single method that performs well.</p>
-<div id="gridded-cross-validation" class="section level2">
-<h2>Gridded cross-validation</h2>
-<p>You can also embed plots. See Figure <a href="#fig:pie">1</a> for example:</p>
-<pre class="r"><code>par(mar = c(0, 1, 0, 1))
-pie(
-  c(280, 60, 20),
-  c(&#39;Sky&#39;, &#39;Sunny side of pyramid&#39;, &#39;Shady side of pyramid&#39;),
-  col = c(&#39;#0292D8&#39;, &#39;#F7EA39&#39;, &#39;#C4B632&#39;),
-  init.angle = -50, border = NA
-)</code></pre>
-<div class="figure"><span style="display:block;" id="fig:pie"></span>
-<img src="{{< blogdown/postref >}}index.en_files/figure-html/pie-1.png" alt="A fancy pie chart." width="672" />
-<p class="caption">
-Figure 1: A fancy pie chart.
-</p>
+<p>Non-negative Matrix Factorization (NMF) gives a low-rank approximation of data. How low-rank should this approximation be? Finding a factorization rank that makes good sense requires <strong>cross-validation</strong>, but sometimes there is no “optimal” rank at all.</p>
+<p>In this post I show when an “optimal” rank might be expected and demonstrate several methods for cross-validation as implemented in the RcppML R package. For challenging situations where an optimal rank is not obvious, I discuss best practices and alternative approaches.</p>
+<hr />
+<div id="sometimes-there-is-no-optimal-rank" class="section level2">
+<h2>Sometimes there is no “optimal” rank</h2>
 </div>
+<div id="getting-set-up" class="section level2">
+<h2>Getting set up</h2>
+<p>We’ll use a dataset describing the expression of &gt;13,000 genes in 2,800 single blood cells:</p>
+<pre class="r"><code>library(Seurat)</code></pre>
+<pre><code>## Warning: package &#39;Seurat&#39; was built under R version 4.0.5</code></pre>
+<pre><code>## Attaching SeuratObject</code></pre>
+<pre class="r"><code>library(SeuratData)</code></pre>
+<pre><code>## Registered S3 method overwritten by &#39;cli&#39;:
+##   method     from         
+##   print.boxx spatstat.geom</code></pre>
+<pre><code>## -- Installed datasets ------------------------------------- SeuratData v0.2.1 --</code></pre>
+<pre><code>## v bmcite       0.3.0                    v pbmc3k       3.1.4
+## v hcabm40k     3.0.0                    v pbmcMultiome 0.1.0
+## v ifnb         3.1.0                    v pbmcsca      3.0.0
+## v panc8        3.0.2                    v stxBrain     0.1.1</code></pre>
+<pre><code>## -------------------------------------- Key -------------------------------------</code></pre>
+<pre><code>## v Dataset loaded successfully
+## &gt; Dataset built with a newer version of Seurat than installed
+## (?) Unknown version of Seurat installed</code></pre>
+<pre class="r"><code>InstallData(&quot;pbmc3k&quot;)</code></pre>
+<pre><code>## Warning: The following packages are already installed and will not be
+## reinstalled: pbmc3k</code></pre>
+<pre class="r"><code>data &lt;- pbmc3k@assays$RNA@counts
+
+library(irlba)  # to run SVD</code></pre>
+<pre><code>## Loading required package: Matrix</code></pre>
+<pre><code>## Warning: package &#39;Matrix&#39; was built under R version 4.0.5</code></pre>
+<pre class="r"><code>library(RcppML) # to run NMF
+library(ggplot2)</code></pre>
+<pre><code>## Warning: package &#39;ggplot2&#39; was built under R version 4.0.5</code></pre>
+<hr />
+</div>
+<div id="can-we-use-a-scree-plot" class="section level2">
+<h2>Can we use a scree plot?</h2>
+<p>You might wonder if we can borrow a page from PCA and SVD and use a simple “scree plot” to estimate rank. A scree plot allows us to find a number of factors that explain a satisfactory amount of variation in the data.</p>
+<pre class="r"><code>scree &lt;- data.frame(&quot;singular value&quot; = irlba(data, 50)$d, &quot;rank&quot; = 1:50)
+ggplot(scree, aes(x = rank, y = singular.value)) + geom_point() + theme_classic()</code></pre>
+<p><img src="{{< blogdown/postref >}}index.en_files/figure-html/unnamed-chunk-3-1.png" width="288" style="display: block; margin: auto auto auto 0;" /></p>
+<p>The “elbow” in this scree plot occurs around <em>k = 7</em>, at least according to my personal goldilocks opinion.</p>
+<p>We can try something similar for NMF. we can plot factorization rank vs. Mean Squared Error (MSE) of each factorization. Will there be an “elbow”?</p>
+<pre class="r"><code>scree &lt;- data.frame(&quot;rank&quot; = unique(floor(1 * 1.25^(0:18))), &quot;MSE&quot; = 0)
+
+for(i in 1:nrow(scree)){
+  model &lt;- nmf(data, k = scree$rank[i], verbose = F)
+  scree$MSE[i] &lt;- mse(data, model$w, model$d, model$h)
+}
+ggplot(scree, aes(x = rank, y = MSE)) + geom_point() + theme_classic()</code></pre>
+<p><img src="{{< blogdown/postref >}}index.en_files/figure-html/unnamed-chunk-4-1.png" width="288" style="display: block; margin: auto auto auto 0;" /></p>
+<p>This is not particularly helpful. Perhaps we might say <em>k = 11</em>, but it’s less obvious than SVD, and sometimes it’s still less obvious.</p>
+<p>NMF gives us no clear-cut “elbow”.</p>
+<p>There is a simple theoretical reason for this: NMF factors are <strong>colinearly</strong> optimized, while PCA and SVD factors are <strong>sequentially</strong> optimized. In other words, NMF finds a set of factors that <strong>collectively</strong> explain signal, while PCA and SVD find factors <strong>one at a time given preceding factors</strong> that explain the most additional variation.</p>
+<p>We can still use a “scree plot” for NMF rank determination, but we need a different objective on the y-axis.</p>
+<hr />
+</div>
+<div id="what-about-k-fold-cross-validation" class="section level2">
+<h2>What about k-fold cross-validation?</h2>
+<p><em>k</em>-fold cross-validation is commonly used for hyperparameter optimization. Generally, samples are split into training and test sets so that models may be fit using training data and assessed using test data. Let’s try this with a simple 1-1 test/training split:</p>
+<pre class="r"><code>test_set &lt;- sample(1:ncol(data), ncol(data) / 2)
+training_set &lt;- (1:ncol(data))[-test_set]
+
+for(i in 1:nrow(scree)){
+  # learn NMF model on training set
+  model &lt;- nmf(data[, training_set], k = scree$rank[i], verbose = F)
+  # project learned model onto test set
+  h_test &lt;- project(data[, test_set], model$w)
+  # calculate MSE of projection on test set
+  scree$MSE[i] &lt;- mse(data[, test_set], model$w, h = h_test)
+}
+ggplot(scree, aes(x = rank, y = MSE)) + geom_point() + theme_classic()</code></pre>
+<p><img src="{{< blogdown/postref >}}index.en_files/figure-html/unnamed-chunk-6-1.png" width="288" style="display: block; margin: auto auto auto 0;" /></p>
+<p>Again, neither is this method convincing. Why? NMF was able to learn about the test data given the training data because the features were shared in common between the test and training set.</p>
+<p>How do we address this? The test and training set must <strong>not contain overlapping samples OR features</strong>.</p>
+<hr />
+</div>
+<div id="bi-cross-validation" class="section level2">
+<h2>Bi-cross-validation</h2>
+<p>Let’s try splitting the data into a grid. Our training set will contain some of the samples and features, while the test set will contain other different samples AND different features. Here’s how it will work:</p>
+<ol style="list-style-type: decimal">
+<li>Train the model on training samples and training features.</li>
+<li>Project the model onto test samples and training features.</li>
+<li>Project that model onto test samples and test features and find the mean squared error.</li>
+</ol>
+<pre class="r"><code>test_samples &lt;- sample(1:ncol(data), ncol(data) / 2)
+training_samples &lt;- (1:ncol(data))[-test_samples]
+test_features &lt;- sample(1:nrow(data), nrow(data) / 2)
+training_features &lt;- (1:nrow(data))[-test_features]
+
+for(i in 1:nrow(scree)){
+  # Train the model on training samples and training features
+  model &lt;- nmf(
+    data[training_features, training_samples], 
+    k = scree$rank[i], verbose = F)
+  # Project the model onto test samples and training features
+  h_test &lt;- project(data[training_features, test_samples], model$w)
+  # Project that model onto test samples and test features
+  w_test &lt;- project(data[test_features, test_samples], h = h_test)
+  # Calculate MSE of the model on the test samples and test features
+  scree$MSE[i] &lt;- mse(data[test_features, test_samples], w_test, h = h_test)
+}
+ggplot(scree, aes(x = rank, y = MSE)) + geom_point() + theme_classic()</code></pre>
+<p><img src="{{< blogdown/postref >}}index.en_files/figure-html/unnamed-chunk-7-1.png" width="288" style="display: block; margin: auto auto auto 0;" /></p>
+<p>This is <em>slightly</em> sharper. Now we might say <em>k = 11</em>, but it’s still subjective.</p>
+<hr />
+</div>
+<div id="cost-of-bipartite-matching" class="section level2">
+<h2>Cost of bipartite matching</h2>
+<p>The robustness of independent sample sets for each rank can be measured by bipartite matching</p>
+<pre class="r"><code>library(RcppHungarian)
+
+samples1 &lt;- sample(1:ncol(data), ncol(data) / 2)
+samples2 &lt;- (1:ncol(data))[-test_samples]
+
+for(i in 1:nrow(scree)){
+  model1 &lt;- nmf(data[, samples1], k = scree$rank[i], verbose = F)
+  model2 &lt;- nmf(data[, samples2], k = scree$rank[i], verbose = F)
+
+  # match w1 and w2
+  sim &lt;- as.matrix(1 - qlcMatrix::cosSparse(model1$w, model2$w) + 1e-5)
+  scree$MSE[i] &lt;- HungarianSolver(sim)$cost / scree$rank[i]
+}</code></pre>
 </div>

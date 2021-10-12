@@ -1,12 +1,12 @@
 ---
-title: Cross-validation for NMF rank determination
-author: Zach DeBruine
+title: "Cross-validation for NMF rank determination"
+author: "Zach DeBruine"
 date: '2021-10-05'
-slug: cross-validation-for-nmf
+output: pdf_document
 categories: []
 tags:
-  - NMF
-  - Cross-validation
+- NMF
+- Cross-validation
 subtitle: ''
 summary: ''
 authors: []
@@ -17,23 +17,151 @@ image:
   focal_point: ''
   preview_only: no
 projects: []
+slug: cross-validation-for-nmf
 ---
 
-Finding the optimal rank for NMF is challenging. Unlike PCA or SVD where interesting factors have high singular values, NMF factors are colinearly optimized.
-
-Several cross-validation methods for NMF have been proposed, yet here we find only a single method that performs well.
-
-## Gridded cross-validation
-
-You can also embed plots. See Figure \@ref(fig:pie) for example:
-
-```{r pie, fig.cap='A fancy pie chart.', tidy=FALSE}
-par(mar = c(0, 1, 0, 1))
-pie(
-  c(280, 60, 20),
-  c('Sky', 'Sunny side of pyramid', 'Shady side of pyramid'),
-  col = c('#0292D8', '#F7EA39', '#C4B632'),
-  init.angle = -50, border = NA
-)
+```{R, warning = F, include = F}
+knitr::opts_chunk$set(echo = TRUE)
 ```
 
+Non-negative Matrix Factorization (NMF) gives a low-rank approximation of data. How low-rank should this approximation be? Finding a factorization rank that makes good sense requires **cross-validation**, but sometimes there is no "optimal" rank at all.
+
+In this post I show when an "optimal" rank might be expected and demonstrate several methods for cross-validation as implemented in the RcppML R package. For challenging situations where an optimal rank is not obvious, I discuss best practices and alternative approaches.
+
+---
+
+## Sometimes there is no "optimal" rank
+
+
+
+## Getting set up
+
+We'll use a dataset describing the expression of >13,000 genes in 2,800 single blood cells:
+
+```{R}
+library(Seurat)
+library(SeuratData)
+InstallData("pbmc3k")
+data <- pbmc3k@assays$RNA@counts
+
+library(irlba)  # to run SVD
+library(RcppML) # to run NMF
+library(ggplot2)
+```
+
+---
+
+## Can we use a scree plot?
+
+You might wonder if we can borrow a page from PCA and SVD and use a simple "scree plot" to estimate rank. A scree plot allows us to find a number of factors that explain a satisfactory amount of variation in the data.
+
+```{R, fig.width = 3, fig.height = 3, fig.align = "left"}
+scree <- data.frame("singular value" = irlba(data, 50)$d, "rank" = 1:50)
+ggplot(scree, aes(x = rank, y = singular.value)) + geom_point() + theme_classic()
+```
+
+The "elbow" in this scree plot occurs around _k = 7_, at least according to my personal goldilocks opinion.
+
+We can try something similar for NMF.  we can plot factorization rank vs. Mean Squared Error (MSE) of each factorization. Will there be an "elbow"?
+
+```{R, fig.width = 3, fig.height = 3, fig.align = "left"}
+scree <- data.frame("rank" = unique(floor(1 * 1.25^(0:18))), "MSE" = 0)
+
+for(i in 1:nrow(scree)){
+  model <- nmf(data, k = scree$rank[i], verbose = F)
+  scree$MSE[i] <- mse(data, model$w, model$d, model$h)
+}
+ggplot(scree, aes(x = rank, y = MSE)) + geom_point() + theme_classic()
+```
+
+```{R, include = FALSE}
+scree
+```
+
+This is not particularly helpful. Perhaps we might say _k = 11_, but it's less obvious than SVD, and sometimes it's still less obvious.
+
+NMF gives us no clear-cut "elbow".
+
+There is a simple theoretical reason for this:  NMF factors are **colinearly** optimized, while PCA and SVD factors are **sequentially** optimized.  In other words, NMF finds a set of factors that **collectively** explain signal, while PCA and SVD find factors **one at a time given preceding factors** that explain the most additional variation.
+
+We can still use a "scree plot" for NMF rank determination, but we need a different objective on the y-axis.
+
+---
+
+## What about k-fold cross-validation?
+
+_k_-fold cross-validation is commonly used for hyperparameter optimization. Generally, samples are split into training and test sets so that models may be fit using training data and assessed using test data. Let's try this with a simple 1-1 test/training split:
+
+```{R, fig.width = 3, fig.height = 3, fig.align = "left"}
+test_set <- sample(1:ncol(data), ncol(data) / 2)
+training_set <- (1:ncol(data))[-test_set]
+
+for(i in 1:nrow(scree)){
+  # learn NMF model on training set
+  model <- nmf(data[, training_set], k = scree$rank[i], verbose = F)
+  # project learned model onto test set
+  h_test <- project(data[, test_set], model$w)
+  # calculate MSE of projection on test set
+  scree$MSE[i] <- mse(data[, test_set], model$w, h = h_test)
+}
+ggplot(scree, aes(x = rank, y = MSE)) + geom_point() + theme_classic()
+```
+
+Again, neither is this method convincing. Why? NMF was able to learn about the test data given the training data because the features were shared in common between the test and training set.
+
+How do we address this? The test and training set must **not contain overlapping samples OR features**.
+
+---
+
+## Bi-cross-validation 
+
+Let's try splitting the data into a grid. Our training set will contain some of the samples and features, while the test set will contain other different samples AND different features. Here's how it will work:
+
+  1. Train the model on training samples and training features.
+  2. Project the model onto test samples and training features.
+  3. Project that model onto test samples and test features and find the mean squared error.
+
+```{R, fig.width = 3, fig.height = 3, fig.align = "left"}
+test_samples <- sample(1:ncol(data), ncol(data) / 2)
+training_samples <- (1:ncol(data))[-test_samples]
+test_features <- sample(1:nrow(data), nrow(data) / 2)
+training_features <- (1:nrow(data))[-test_features]
+
+for(i in 1:nrow(scree)){
+  # Train the model on training samples and training features
+  model <- nmf(
+    data[training_features, training_samples], 
+    k = scree$rank[i], verbose = F)
+  # Project the model onto test samples and training features
+  h_test <- project(data[training_features, test_samples], model$w)
+  # Project that model onto test samples and test features
+  w_test <- project(data[test_features, test_samples], h = h_test)
+  # Calculate MSE of the model on the test samples and test features
+  scree$MSE[i] <- mse(data[test_features, test_samples], w_test, h = h_test)
+}
+ggplot(scree, aes(x = rank, y = MSE)) + geom_point() + theme_classic()
+```
+
+This is _slightly_ sharper. Now we might say _k = 11_, but it's still subjective.
+
+---
+
+## Cost of bipartite matching
+
+The robustness of independent sample sets for each rank can be measured by bipartite matching
+
+```{R, fig.width = 3, fig.height = 3, fig.align = "left"}
+library(RcppHungarian)
+
+samples1 <- sample(1:ncol(data), ncol(data) / 2)
+samples2 <- (1:ncol(data))[-test_samples]
+
+for(i in 1:nrow(scree)){
+  model1 <- nmf(data[, samples1], k = scree$rank[i], verbose = F)
+  model2 <- nmf(data[, samples2], k = scree$rank[i], verbose = F)
+
+  # match w1 and w2
+  sim <- as.matrix(1 - qlcMatrix::cosSparse(model1$w, model2$w) + 1e-5)
+  scree$MSE[i] <- HungarianSolver(sim)$cost / scree$rank[i]
+}
+```
