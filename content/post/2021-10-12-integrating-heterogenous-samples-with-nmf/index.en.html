@@ -1,0 +1,85 @@
+---
+title: "Integrating Heterogenous Samples with NMF"
+author: "Zach DeBruine"
+date: '2021-10-12'
+slug: integrating-with-nmf
+categories:
+- NMF
+- integration
+tags:
+- NMF
+- integration
+subtitle: Aligning cancer methylation signatures with healthy cell-of-origin signatures
+summary: Integrating mixed or heterogenous signals requires source separation. By
+  using subsets of NMF factors, similarities between these signals can be visualized.
+featured: no
+image:
+  caption: ''
+  focal_point: ''
+  preview_only: yes
+---
+
+
+
+<div id="nmf-for-source-separation" class="section level2">
+<h2>NMF for source separation</h2>
+<p>One of the many applications of NMF is <a href="https://en.wikipedia.org/wiki/Signal_separation">source separation</a>, aka blind signal separation, where a mixture of signals are resolved in a factor model. Different samples will contain different signals, some unique, and some shared. The goal might be to visualize samples based on signals they share, or to identify discriminating signals.</p>
+</div>
+<div id="integrative-nmf" class="section level2">
+<h2>Integrative NMF?</h2>
+<p>Integrative NMF (iNMF) has been proposed for source separation and integration of heterogenous datasets (see <a href="https://github.com/welch-lab/liger">LIGER</a>). However, iNMF requires a regularization hyperparameter to enforce integration, and fitting is inherently slow.</p>
+<p>Instead, we can simply run NMF on all signals and then annotate what factors are specific to metadata of interest.</p>
+</div>
+<div id="cancer-vs.-healthy-cell-signatures" class="section level2">
+<h2>Cancer vs. healthy cell signatures</h2>
+<p>Classification of cancer cell-of-origin is a great example of source separation. Here, the challenge is to tease out signatures shared by cancer and healthy cell types to discover the cell type from which the cancer originated.</p>
+<p>We’ll use the <code>aml</code> dataset from the <code>MLdata</code> package:</p>
+<pre class="r"><code>devtools::install_github(&quot;zdebruine/MLdata&quot;)
+devtools::install_RcppML(&quot;zdebruine/RcppML&quot;)</code></pre>
+<pre class="r"><code>library(RcppML)
+library(MLdata)
+library(ggplot2)
+library(cowplot)
+library(umap)
+data(aml)</code></pre>
+<p>The <code>MLdata::aml</code> dataset contains samples from 123 patients with Acute Myelogenous Leukemia (AML) and 5 samples each for putative cells of origin (GMP, LMPP, or MEP cells) from healthy patients. Each sample contains information on ~800 differentially methylated regions (DMRs), a measure of gene expression signatures.</p>
+<pre class="r"><code>table(colnames(aml))</code></pre>
+<pre><code>## 
+## AML sample        GMP       LMPP        MEP 
+##        123          5          5          5</code></pre>
+<p>Since we have three cell types and cancer, we’ll choose a low factorization rank (<code>k = 5</code>). We’ll fit to machine-tolerances and input ten random seeds so that <code>RcppML::nmf</code> runs factorizations from ten unique random initializations, and returns the best model of the ten:</p>
+<pre class="r"><code>nmf_model &lt;- RcppML::nmf(aml, k = 5, tol = 1e-10, maxit = 1000, seed = 1:10, verbose = F)</code></pre>
+</div>
+<div id="annotating-signal-sources" class="section level2">
+<h2>Annotating signal sources</h2>
+<p>We can see which sample types are represented in each NMF factor:</p>
+<pre class="r"><code>plot(summary(nmf_model, group_by = colnames(aml), stat = &quot;mean&quot;))</code></pre>
+<p><img src="{{< blogdown/postref >}}index.en_files/figure-html/summary_plot-1.png" width="384" style="display: block; margin: auto auto auto 0;" /></p>
+<p>Notice how factor 3 almost exclusively describes methylation signal in healthy cells.</p>
+<p>Let’s plot factor 3 vs. factor 5:</p>
+<pre class="r"><code>biplot(nmf_model, factors = c(3, 5), matrix = &quot;h&quot;, group_by = colnames(aml))</code></pre>
+<p><img src="{{< blogdown/postref >}}index.en_files/figure-html/biplot-1.png" width="384" style="display: block; margin: auto auto auto 0;" /></p>
+<p>Clearly if we want to “integrate” cancer and healthy cells for the purposes of classifying cell-of-origin, we do not want to be including factor 3 in that analysis.</p>
+</div>
+<div id="umap-on-the-nmf-embedding" class="section level2">
+<h2>UMAP on the NMF embedding</h2>
+<p>Let’s learn a UMAP embedding of all samples on NMF coordinates using the full NMF model.</p>
+<pre class="r"><code>plot_umap &lt;- function(nmf_model){
+  set.seed(123)
+  u &lt;- uwot::umap(t(nmf_model$h), n_neighbors = 10, metric = &quot;cosine&quot;, min_dist = 0.3, spread = 1)
+  df &lt;- data.frame(&quot;umap1&quot; = u[, 1], &quot;umap2&quot; = u[, 2], &quot;group&quot; = colnames(nmf_model$h))
+  ggplot(df, aes(x = umap1, y = umap2, color = group)) + geom_point() + theme_void()
+}
+
+plot_umap(nmf_model)</code></pre>
+<p><img src="{{< blogdown/postref >}}index.en_files/figure-html/umap_all-1.png" width="288" style="display: block; margin: auto auto auto 0;" /></p>
+<p>Clearly there are fundamental differences between cancer and healthy cells.</p>
+</div>
+<div id="integrating-by-source-separation" class="section level2">
+<h2>Integrating by source separation</h2>
+<p>Let’s do the same as we did above, but now excluding factor 3:</p>
+<pre class="r"><code>plot_umap(nmf_model[-3])</code></pre>
+<p><img src="{{< blogdown/postref >}}index.en_files/figure-html/umap_integrated-1.png" width="288" style="display: block; margin: auto auto auto 0;" /></p>
+<p>Bingo! We are able to classify cancer cells based on healthy cell-of-origin!</p>
+<p>In conclusion, we were able to integrate cancer and healthy cell methylation signatures by finding factors describing variation they shared in common.</p>
+</div>
