@@ -45,8 +45,6 @@ title: Zach DeBruine
 
 My name is Zach DeBruine and I am a postdoctoral fellow in bioinformatics at the [Van Andel Institute](https://www.vai.org/). I work in the [Center for Epigenetics](https://vari.vai.org/epigenetics/) within the [Triche Lab](https://trichelab.vai.org/) where I develop simple methods for fast dimensional reduction of large single-cell datasets.
 
-I developed the general-purpose [Rcpp Machine Learning Library (RcppML)](https://github.com/zdebruine/RcppML) R package for non-negative factorization and clustering. For single-cell analysis, I am developing the [singlet](https://github.com/zdebruine/singlet) R package to extend RcppML functions.
-
-I live in Grand Rapids, MI, with my wife, three kids, and a collection of random pets.
+I developed the general-purpose [Rcpp Machine Learning Library (RcppML)](https://github.com/zdebruine/RcppML) R package for non-negative factorization and clustering. This blog is my outlet for experimenting with new ideas, testing development version functionality, and documenting random hypotheses I might have about random things.
 
 This blog is built with [blogdown](https://github.com/rstudio/blogdown) and [Hugo](https://gohugo.io/), and deployed using [Netlify](https://www.netlify.com/).
