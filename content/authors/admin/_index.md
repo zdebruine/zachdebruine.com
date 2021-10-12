@@ -1,5 +1,5 @@
 ---
-bio: Postdoctoral fellow in bioinformatics with interests in single-cell experiments and non-negative dimensional reduction. I love simple, fast, and common sense data analysis.
+bio: Postdoctoral fellow in bioinformatics interested in single-cell experiments and dimensional reduction. I love simple, fast, and common sense data analysis.
 education:
   courses:
   - course: PhD in Biochemistry and Bioinformatics
@@ -43,8 +43,8 @@ superuser: true
 title: Zach DeBruine
 ---
 
-My name is Zach DeBruine and I am a postdoctoral fellow in bioinformatics at the [Van Andel Institute](https://www.vai.org/). I work in the [Center for Epigenetics](https://vari.vai.org/epigenetics/) within the [Triche Lab](https://trichelab.vai.org/) where I develop simple methods for fast dimensional reduction of large single-cell datasets.
+My name is Zach DeBruine and I am a postdoctoral fellow in bioinformatics at the [Van Andel Institute](https://www.vai.org/). I work in the [Center for Epigenetics](https://vari.vai.org/epigenetics/) within the [Triche Lab](https://trichelab.vai.org/) where I develop methods for analysis of single-cell experiments. I love simple, fast, and common sense data analysis.
 
-I developed the general-purpose [Rcpp Machine Learning Library (RcppML)](https://github.com/zdebruine/RcppML) R package for non-negative factorization and clustering. This blog is my outlet for experimenting with new ideas, testing development version functionality, and documenting random hypotheses I might have about random things.
+I developed the general-purpose [Rcpp Machine Learning Library (RcppML)](https://github.com/zdebruine/RcppML) R package for non-negative factorization and clustering. This blog is my sandbox for trying new things, sharing stuff I've learned, and testing stuff I've built.
 
 This blog is built with [blogdown](https://github.com/rstudio/blogdown) and [Hugo](https://gohugo.io/), and deployed using [Netlify](https://www.netlify.com/).
