@@ -163,7 +163,7 @@ Factor 7 describes a wet rainforest community while Factor 8 describes dry rainf
 
 ## UMAP on NMF embeddings
 
-We might also be interested in visualizing how factors in $w$ capture similarities among bird species using UMAP.
+We might also be interested in visualizing how factors in `w` capture similarities among bird species using UMAP.
 
 ```{R, warning = FALSE, message = FALSE, fig.width = 8, fig.height = 2.5}
 set.seed(123)
