@@ -1,0 +1,269 @@
+---
+title: "Making sense of L1- and L2-regularized NMF"
+author: "Zach DeBruine"
+date: '2021-10-16'
+slug: l2-regularized-nmf
+categories:
+- NMF
+- methods
+tags:
+- NMF
+- regularization
+- L2
+subtitle: Extending L1 and L2 regularization to non-negative matrix factorization
+summary: Convex least squares regularization of a non-negative matrix factorization
+  does not produce the expected results without scaling. Here I explore the application
+  to NMF for the L1/LASSO and the L2/Ridge regularizations, and show how one is sparsifying and 
+  the other is densifying.
+featured: no
+image:
+  caption: ''
+  focal_point: ''
+  preview_only: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, fig.align = "left")
+```
+
+## Key Takeaways
+
+* L1 is a sparsifying NMF regularization
+* L2 is a densifying NMF regularization
+* L1 decreases the angle between factors
+* L2 increases the angle between factors
+
+## Regularizing NMF
+
+Regularizations are intended to improve the interpretability or identifiability of linear models. Consider the least squares problem $ax = b$, for which common regularizations include:
+
+* **L1/LASSO** regularization: absolute shrinkage, penalty subtracted from $b$
+* **L2/Ridge** regularization: convex shrinkage, penalty added to diagonal of $a$
+
+In a typical non-negative least squares (NNLS) fit, these regularizations behave usefully. For example, an L1 penalty equal to the maximum value in $b$ will ensure complete sparsity of the solution.
+
+Now consider NMF by alternating least squares.  NMF differs from one-off least squares problems in several ways:
+
+* It is iterative
+* The initial distribution of the models are unknown (i.e. projection of random factors)
+* The distribution of a model at a given iteration is dependent on that of the models at all previous iterations
+
+Thus, NMF regularizations have a chain effect:  a change in one iteration will lead to a change in information and distribution in the next, and so forth. Thus, if the distribution of the model is not controlled after each update, penalties will cause the model to spiral out of control.
+
+## Controlling NMF model distributions during updates
+
+NMF minimizes $A = wh$. The least squares update of $h$, column $j$ given $A$ and $w$ is:
+
+$$w^Twh_j = w^TA_j$$
+
+Correspondingly, the least squares update of $w$, row $j$, given $A$ and $h$ is:
+
+$$hh^Tw_j = hA^T_j$$
+These equations are in the form $ax = b$. For instance, in the update of $h$, $a = w^Tw$ and $b = w^TA_j$. 
+
+For a regularization penalty strictly in the range (0, 1], we want to guarantee that the penalty will be consistent across random NMF restarts, different datasets, and across alternating least squares updates. To guarantee consistent application of the penalty, we need to control the distribution of $a$ and $b$. 
+
+The distribution of a model can be controlled by diagonalizing the NMF model, such that $A = wdh$, where columns in $w$ and rows in $h$ are scaled to sum to 1 by a scaling diagonal, $d$. Factors need not scale to 1, it could be any constant value, but 1 provides nice interpretability.
+
+## Diagonalized NMF enables convex regularization
+
+Let's load the `hawaiibirds` dataset and factorize the data at all L1 and L2 penalties between 0 and 0.99, at increments of 0.01. We will do so with and without model diagonalization to observe what happens. Our measure of interest is the mean sparsity of the $w$ and $h$ models.
+
+```{R install_stuff, warning = FALSE, message = FALSE}
+# devtools::install_github("zdebruine/RcppML")
+library(RcppML)
+data(hawaiibirds)
+A <- hawaiibirds$counts
+```
+
+```{R}
+penalties <- seq(0, 0.98, 0.02)
+seeds <- c(123, 456, 789)
+df <- data.frame()
+for(penalty in penalties){
+  for(seed in seeds){
+    for(diag in c(FALSE, TRUE)){
+      df <- rbind(df, 
+                  data.frame("penalty" = penalty, 
+                             "seed" = seed, 
+                             "diag" = diag, 
+                             "regularization" = "L1", 
+                             "sparsity" = mean(subset(sparsity(
+                               nmf(A, 10, L1 = penalty, seed = seed, diag = diag)
+                               ), model == "w")$sparsity)
+                            )
+                  )
+      df <- rbind(df,
+                  data.frame("penalty" = penalty, 
+                             "seed" = seed, 
+                             "diag" = diag, 
+                             "regularization" = "L2", 
+                             "sparsity" = mean(subset(sparsity(
+                               nmf(A, 10, L2 = penalty, seed = seed, diag = diag)
+                             ), model == "w")$sparsity)
+                            )
+                  )
+    }
+  }
+}
+df$regularization <- factor(df$regularization)
+df$seed <- factor(df$seed)
+```
+
+```{R, echo = FALSE, fig.height = 6, fig.width = 8, warning = FALSE}
+library(ggplot2)
+library(cowplot)
+p1 <- ggplot(subset(df, diag == FALSE & regularization == "L1"), aes(x = penalty, y = sparsity, color = seed)) +
+  geom_point() + labs(x = "L1 penalty", y = "sparsity of 'w'") + ggtitle("no scaling") +
+  theme_classic() + theme(plot.title = element_text(hjust = 0.5), aspect.ratio = 1)
+p2 <- ggplot(subset(df, diag == TRUE & regularization == "L1"), aes(x = penalty, y = sparsity, color = seed)) +
+  geom_point() + labs(x = "L1 penalty", y = "sparsity of 'w'") + ggtitle("with scaling") +
+  theme_classic() + theme(plot.title = element_text(hjust = 0.5), aspect.ratio = 1)
+p3 <- ggplot(subset(df, diag == FALSE & regularization == "L2"), aes(x = penalty, y = sparsity, color = seed)) +
+  geom_point() + labs(x = "L2 penalty", y = "sparsity of 'w'") + ggtitle("no scaling") +
+  theme_classic() + theme(plot.title = element_text(hjust = 0.5), aspect.ratio = 1)
+p4 <- ggplot(subset(df, diag == TRUE & regularization == "L2"), aes(x = penalty, y = sparsity, color = seed)) +
+  geom_point() + labs(x = "L2 penalty", y = "sparsity of 'w'") + ggtitle("with scaling") +
+  theme_classic() + theme(plot.title = element_text(hjust = 0.5), aspect.ratio = 1)
+plot_grid(
+  plot_grid(p1 + theme(legend.position = "none"),
+          p2 + theme(legend.position = "none"),
+          p3 + theme(legend.position = "none"),
+          p4 + theme(legend.position = "none"),
+          nrow = 2, ncol = 2, labels = "auto"),
+  get_legend(p1),
+  rel_widths = c(1, 0.2), nrow = 1)
+```
+
+Takeaways:
+
+* Diagonal scaling guarantees consistent regularization between independent replicates (compare **a**, **c** with **b**, **d**)
+* L1 regularization increases sparsity of factor models (**b**) while L2 regularization promotes density of the model (**d**)
+* L1 = 1 guarantees complete sparsity (**b**) while L2 = 1 guarantees complete density (**d**)
+
+Not shown here, diagonal scaling also ensures factors are equally affected by the regularization, rather than factors which explain most of the MSE remaining unaffected while lesser factors are driven to high sparsity.
+
+We might not have expected that L2 is a densifying factorization. Why is this?  L2 convexly shrinks values towards zero, and as such decreases the condition number of $a$. This means signals will be encouraged to "squash" together, and factors in the resulting model will begin to describe similar signal. As this occurs, the model naturally becomes denser until a point is reached that the objective is minimized (at convergence).
+
+## Properties of L1- and L2-regularized NMF
+
+Let's consider how L1 and L2 regularizations affect the robustness of information content of factor models relative to the unregularized equivalent, and how they affect the mean squared error loss of the models.
+
+As a measure of the robustness of information content, we use the mean cost of bipartite matching between L1-regularized and unregularized $w$ models on a cosine similarity matrix. 
+
+```{R}
+m <- nmf(A, 10, seed = 123)
+penalties <- seq(0.01, 0.5, 0.01)
+df <- data.frame()
+for(penalty in penalties){
+  m_L1 <- nmf(A, 10, seed = 123, L1 = penalty)
+  df <- rbind(df, data.frame(
+    "penalty" = penalty, 
+    "regularization" = "L1", 
+    "robustness" = 1 - bipartiteMatch(1 - cosine(m_L1@w, m@w))$cost/10,
+    "mse" = evaluate(m_L1, A)
+  ))
+  m_L2 <- nmf(A, 10, seed = 123, L2 = penalty)
+  df <- rbind(df, data.frame(
+    "penalty" = penalty, 
+    "regularization" = "L2", 
+    "robustness" = 1 - bipartiteMatch(1 - cosine(m_L2@w, m@w))$cost/10,
+    "mse" = evaluate(m_L2, A)
+  ))
+}
+df$regularization <- factor(df$regularization)
+```
+
+```{R, fig.width = 7, fig.height = 3, echo = FALSE}
+p1 <- ggplot(df, aes(x = penalty, y = robustness, color = regularization)) +
+  geom_point() + labs(x = "penalty", y = "similarity to\nunregularized model") +
+  theme_classic() + theme(aspect.ratio = 1) + scale_x_continuous(trans = "sqrt")
+p2 <- ggplot(df, aes(x = penalty, y = mse, color = regularization)) +
+  geom_point() + labs(x = "penalty", y = "MSE") +
+  theme_classic() + theme(aspect.ratio = 1) + scale_x_continuous(trans = "sqrt")
+
+plot_grid(p1 + theme(legend.position = "none"),
+          p2 + theme(legend.position = "none"),
+          get_legend(p1),
+          nrow = 1, labels = "auto")
+```
+
+Notice how  the L2 penalties tend to be much harsher than the L1 penalties. However, both penalties cause movement of the model away from the unregularized state.
+
+Within the models themselves, we can examine how similar factors are to one another by measuring the mean cosine angle:
+
+```{R, fig.width = 4, fig.height = 3}
+penalties <- c(seq(0, 0.1, 0.005), seq(0.11, 0.5, 0.01))
+df <- data.frame()
+for(penalty in penalties){
+  m_L1 <- nmf(A, 10, seed = 123, L1 = penalty)
+  df <- rbind(df, data.frame(
+    "penalty" = penalty, "regularization" = "L1", "mean_angle" = mean(cosine(m_L1@w))
+  ))
+  m_L2 <- nmf(A, 10, seed = 123, L2 = penalty)
+  df <- rbind(df, data.frame(
+    "penalty" = penalty, "regularization" = "L2", "mean_angle" = mean(cosine(m_L2@w))
+  ))
+}
+df$regularization <- factor(df$regularization)
+ggplot(df, aes(x = penalty, y = mean_angle, color = regularization)) +
+  geom_point() + labs(x = "penalty", y = "mean cosine angle\nbetween factors") +
+  theme_classic() + theme(aspect.ratio = 1) + scale_x_continuous(trans = "sqrt")
+```
+
+We can see that L1 penalty increases the distance between factors, while L2 penalty increases the similarity between factors.
+
+How do these models differ from a practical perspective?
+
+## Interpreting L1- and L2-regularized factor models
+
+We'll select regularization parameters for further analysis based on a cosine angle of about 0.25 away from the original model:
+
+```{R}
+model    <- nmf(A, 10, tol = 1e-6, seed = 123)
+model_L1 <- nmf(A, 10, tol = 1e-6, seed = 123, L1 = 0.2)
+model_L2 <- nmf(A, 10, tol = 1e-6, seed = 123, L2 = 0.02)
+```
+
+Take a look at the clustering of factors in the $w$ models on UMAP coordinates:
+
+```{R, echo = FALSE, message = FALSE, warning = FALSE, fig.width = 3, fig.height = 3}
+library(uwot)
+colnames(model@w) <- rep("default", 10)
+colnames(model_L1@w) <- rep("L1", 10)
+colnames(model_L2@w) <- rep("L2", 10)
+m <- t(cbind(model$w, model_L1$w, model_L2$w))
+set.seed(123)
+umap_coords <- uwot::umap(m, n_neighbors = 3, metric = "cosine")
+umap_coords <- data.frame("umap1" = umap_coords[,1], "umap2" = umap_coords[,2], "model" = rownames(m))
+ggplot(umap_coords, aes(x = umap1, y = umap2, color = model)) + geom_point() + theme_void()
+```
+
+Similar information is clearly being captured by each of the models, but let's see in what way. 
+
+We'll align factors in the regularized models to the unregularized models, and then compare specific factors.
+
+```{R, warning = FALSE, fig.width = 6, fig.height = 6}
+library(ggrepel)
+biplot <- function(model1, model2, factor){
+  df <- data.frame("model1" = model1$w[, factor], "model2" = model2$w[, factor], "label" = rownames(model1$w))
+  ggplot(df, aes(x = model1, y = model2, label = label)) + geom_point() + theme_classic() + geom_text_repel(size = 2.5)
+}
+
+model_L1 <- align(model_L1, model)
+model_L2 <- align(model_L2, model)
+
+p1 <- biplot(model, model_L1, 1) + labs(x = "No penalty", y = "L1 = 0.2") + 
+  theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5)) + ggtitle("factor 1")
+p2 <- biplot(model, model_L1, 8) + labs(x = "No penalty", y = "L1 = 0.2") + 
+  theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5)) + ggtitle("factor 8")
+p3 <- biplot(model, model_L2, 1) + labs(x = "No penalty", y = "L2 = 0.02") + 
+  theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5)) + ggtitle("factor 1")
+p4 <- biplot(model, model_L2, 8) + labs(x = "No penalty", y = "L2 = 0.02") + 
+  theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5)) + ggtitle("factor 8")
+plot_grid(p1, p2, p3, p4, nrow = 2, ncol = 2, labels = "auto")
+```
+
+These are very harsh penalties, so notice how L1 can over-sparsify things, while L2 can generate factors that are so dense the information is hardly specific or informative.
+
+A happy medium for sparsifying (or densifying) regularization certainly exists, and this is an objective hyperparameter that must be determined against the objectives of the analysis. Unfortunately, there is nothing against which to optimize -- this appears to be a matter of statistical taste.
