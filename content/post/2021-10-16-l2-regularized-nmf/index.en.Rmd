@@ -1,7 +1,7 @@
 ---
 title: "Making sense of L1- and L2-regularized NMF"
 author: "Zach DeBruine"
-date: '2021-10-16'
+date: '2021-10-18'
 slug: l2-regularized-nmf
 categories:
 - NMF
@@ -10,11 +10,11 @@ tags:
 - NMF
 - regularization
 - L2
-subtitle: Extending L1 and L2 regularization to non-negative matrix factorization
-summary: Convex least squares regularization of a non-negative matrix factorization
-  does not produce the expected results without scaling. Here I explore the application
-  to NMF for the L1/LASSO and the L2/Ridge regularizations, and show how one is sparsifying and 
-  the other is densifying.
+subtitle: Statistical properties of L1- and L2-regularized NMF
+summary: L1 and L2 regularized NMF has special properties which control the information
+  in the NMF model. Here I show how L1 is a sparsifying regularization that promotes
+  a k-means clustering-like model, while L2 is a densifying regularization that promotes
+  convergence of all factors towards the first singular vector.
 featured: no
 image:
   caption: ''
@@ -28,10 +28,11 @@ knitr::opts_chunk$set(echo = TRUE, fig.align = "left")
 
 ## Key Takeaways
 
-* L1 is a sparsifying NMF regularization
-* L2 is a densifying NMF regularization
-* L1 decreases the angle between factors
-* L2 increases the angle between factors
+For non-negative matrix factorization:
+* L1 and L2 regularization require diagonalization (factorization of the form $A = wdh$)
+* L1 is a sparsifying, L2 is densifying
+* L1 increases angle between factors, L2 decreases angle between factors
+* L1 penalties cause factors to converge collectively towards a k-means clustering model, L2 penalties cause each factor to converge individually towards the first singular vector
 
 ## Regularizing NMF
 
@@ -77,54 +78,60 @@ A <- hawaiibirds$counts
 ```
 
 ```{R}
-penalties <- seq(0, 0.98, 0.02)
+alphas <- c(c(1, 3, 5, 9) %o% 10^(-3:-1)) # c(seq(0, 0.1, 0.005), seq(0.11, 0.5, 0.01)) # seq(0, 0.98, 0.02)
 seeds <- c(123, 456, 789)
+kmeans_centers <- t(kmeans(t(as.matrix(A)), 10)$centers)
+svd1 <- nmf(A, 1)@w
 df <- data.frame()
-for(penalty in penalties){
+for(alpha in alphas){
   for(seed in seeds){
     for(diag in c(FALSE, TRUE)){
-      df <- rbind(df, 
-                  data.frame("penalty" = penalty, 
-                             "seed" = seed, 
-                             "diag" = diag, 
-                             "regularization" = "L1", 
-                             "sparsity" = mean(subset(sparsity(
-                               nmf(A, 10, L1 = penalty, seed = seed, diag = diag)
-                               ), model == "w")$sparsity)
-                            )
+      m <- nmf(A, 10, seed = seed, diag = diag)
+        for(penalty in c("L1", "L2")){
+        m_ <- nmf(A, 10, seed = seed, diag = diag,
+                   L1 = ifelse(penalty == "L1", alpha, 0), 
+                   L2 = ifelse(penalty == "L2", alpha, 0),
                   )
-      df <- rbind(df,
-                  data.frame("penalty" = penalty, 
-                             "seed" = seed, 
-                             "diag" = diag, 
-                             "regularization" = "L2", 
-                             "sparsity" = mean(subset(sparsity(
-                               nmf(A, 10, L2 = penalty, seed = seed, diag = diag)
-                             ), model == "w")$sparsity)
-                            )
-                  )
+        df <- rbind(df, data.frame(
+          "alpha" = alpha,
+          "seed" = seed,
+          "diag" = diag,
+          "penalty" = penalty,
+          "sparsity" = sum(m_@w == 0) / prod(dim(m_@w)),
+          "robustness" = 1 - bipartiteMatch(1 - cosine(m_@w, m@w))$cost/10,
+          "mse" = evaluate(m_, A),
+          "mean_angle" = mean(cosine(m_@w)),
+          "kmeans" = bipartiteMatch(1 - cosine(kmeans_centers, m_@w))$cost/10,
+          "svd1" = sum(cosine(m_@w, svd1))/10,
+          "color" = ifelse(penalty == "L1", alpha^0.25, -alpha^0.25)
+        ))      
+      }
     }
   }
 }
-df$regularization <- factor(df$regularization)
+df$penalty <- factor(df$penalty)
 df$seed <- factor(df$seed)
 ```
 
-```{R, echo = FALSE, fig.height = 6, fig.width = 8, warning = FALSE}
+```{R, echo = FALSE, fig.height = 6, fig.width = 8, warning = FALSE, message = FALSE}
 library(ggplot2)
 library(cowplot)
-p1 <- ggplot(subset(df, diag == FALSE & regularization == "L1"), aes(x = penalty, y = sparsity, color = seed)) +
+p1 <- ggplot(subset(df, diag == FALSE & penalty == "L1"), aes(x = alpha, y = sparsity, color = seed)) +
   geom_point() + labs(x = "L1 penalty", y = "sparsity of 'w'") + ggtitle("no scaling") +
-  theme_classic() + theme(plot.title = element_text(hjust = 0.5), aspect.ratio = 1)
-p2 <- ggplot(subset(df, diag == TRUE & regularization == "L1"), aes(x = penalty, y = sparsity, color = seed)) +
+  theme_classic() + theme(plot.title = element_text(hjust = 0.5), aspect.ratio = 1) + scale_y_continuous(limits = c(0.6, 1)) + scale_x_continuous(trans = "log10") +
+  stat_smooth(se = F)
+p2 <- ggplot(subset(df, diag == TRUE & penalty == "L1"), aes(x = alpha, y = sparsity, color = seed)) +
   geom_point() + labs(x = "L1 penalty", y = "sparsity of 'w'") + ggtitle("with scaling") +
-  theme_classic() + theme(plot.title = element_text(hjust = 0.5), aspect.ratio = 1)
-p3 <- ggplot(subset(df, diag == FALSE & regularization == "L2"), aes(x = penalty, y = sparsity, color = seed)) +
+  theme_classic() + theme(plot.title = element_text(hjust = 0.5), aspect.ratio = 1) + scale_y_continuous(limits = c(0.6, 1))  + scale_x_continuous(trans = "log10") +
+  stat_smooth(se = F)
+p3 <- ggplot(subset(df, diag == FALSE & penalty == "L2"), aes(x = alpha, y = sparsity, color = seed)) +
   geom_point() + labs(x = "L2 penalty", y = "sparsity of 'w'") + ggtitle("no scaling") +
-  theme_classic() + theme(plot.title = element_text(hjust = 0.5), aspect.ratio = 1)
-p4 <- ggplot(subset(df, diag == TRUE & regularization == "L2"), aes(x = penalty, y = sparsity, color = seed)) +
+  theme_classic() + theme(plot.title = element_text(hjust = 0.5), aspect.ratio = 1)  + scale_x_continuous(trans = "log10") +
+  stat_smooth(se = F)
+p4 <- ggplot(subset(df, diag == TRUE & penalty == "L2"), aes(x = alpha, y = sparsity, color = seed)) +
   geom_point() + labs(x = "L2 penalty", y = "sparsity of 'w'") + ggtitle("with scaling") +
-  theme_classic() + theme(plot.title = element_text(hjust = 0.5), aspect.ratio = 1)
+  theme_classic() + theme(plot.title = element_text(hjust = 0.5), aspect.ratio = 1) + scale_x_continuous(trans = "log10") +
+  stat_smooth(se = F)
 plot_grid(
   plot_grid(p1 + theme(legend.position = "none"),
           p2 + theme(legend.position = "none"),
@@ -151,69 +158,71 @@ Let's consider how L1 and L2 regularizations affect the robustness of informatio
 
 As a measure of the robustness of information content, we use the mean cost of bipartite matching between L1-regularized and unregularized $w$ models on a cosine similarity matrix. 
 
-```{R}
-m <- nmf(A, 10, seed = 123)
-penalties <- seq(0.01, 0.5, 0.01)
-df <- data.frame()
-for(penalty in penalties){
-  m_L1 <- nmf(A, 10, seed = 123, L1 = penalty)
-  df <- rbind(df, data.frame(
-    "penalty" = penalty, 
-    "regularization" = "L1", 
-    "robustness" = 1 - bipartiteMatch(1 - cosine(m_L1@w, m@w))$cost/10,
-    "mse" = evaluate(m_L1, A)
-  ))
-  m_L2 <- nmf(A, 10, seed = 123, L2 = penalty)
-  df <- rbind(df, data.frame(
-    "penalty" = penalty, 
-    "regularization" = "L2", 
-    "robustness" = 1 - bipartiteMatch(1 - cosine(m_L2@w, m@w))$cost/10,
-    "mse" = evaluate(m_L2, A)
-  ))
-}
-df$regularization <- factor(df$regularization)
-```
-
-```{R, fig.width = 7, fig.height = 3, echo = FALSE}
-p1 <- ggplot(df, aes(x = penalty, y = robustness, color = regularization)) +
-  geom_point() + labs(x = "penalty", y = "similarity to\nunregularized model") +
-  theme_classic() + theme(aspect.ratio = 1) + scale_x_continuous(trans = "sqrt")
-p2 <- ggplot(df, aes(x = penalty, y = mse, color = regularization)) +
-  geom_point() + labs(x = "penalty", y = "MSE") +
-  theme_classic() + theme(aspect.ratio = 1) + scale_x_continuous(trans = "sqrt")
+```{R, fig.width = 7, fig.height = 3, echo = FALSE, warning = FALSE, message = FALSE}
+p1 <- ggplot(subset(df, diag == TRUE & seed == 123), aes(x = alpha, y = robustness, color = penalty)) +
+  geom_point() + labs(y = "similarity to\nunregularized model") +
+  theme_classic() + theme(aspect.ratio = 1) + scale_x_continuous(trans = "log10") +
+  stat_smooth(se = F)
+p2 <- ggplot(subset(df, diag == TRUE & seed == 123), aes(x = alpha, y = mse, color = penalty)) +
+  geom_point() + labs(y = "MSE") +
+  theme_classic() + theme(aspect.ratio = 1) + scale_x_continuous(trans = "log10") +
+  stat_smooth(se = F)
 
 plot_grid(p1 + theme(legend.position = "none"),
           p2 + theme(legend.position = "none"),
           get_legend(p1),
-          nrow = 1, labels = "auto")
+          nrow = 1, labels = c("a", "b", ""), rel_widths = c(1, 1, 0.4))
 ```
 
-Notice how  the L2 penalties tend to be much harsher than the L1 penalties. However, both penalties cause movement of the model away from the unregularized state.
+Notice how the L2 penalties tend to be much harsher than the L1 penalties. However, both penalties cause movement of the model away from the unregularized state.
 
 Within the models themselves, we can examine how similar factors are to one another by measuring the mean cosine angle:
 
-```{R, fig.width = 4, fig.height = 3}
-penalties <- c(seq(0, 0.1, 0.005), seq(0.11, 0.5, 0.01))
-df <- data.frame()
-for(penalty in penalties){
-  m_L1 <- nmf(A, 10, seed = 123, L1 = penalty)
-  df <- rbind(df, data.frame(
-    "penalty" = penalty, "regularization" = "L1", "mean_angle" = mean(cosine(m_L1@w))
-  ))
-  m_L2 <- nmf(A, 10, seed = 123, L2 = penalty)
-  df <- rbind(df, data.frame(
-    "penalty" = penalty, "regularization" = "L2", "mean_angle" = mean(cosine(m_L2@w))
-  ))
-}
-df$regularization <- factor(df$regularization)
-ggplot(df, aes(x = penalty, y = mean_angle, color = regularization)) +
-  geom_point() + labs(x = "penalty", y = "mean cosine angle\nbetween factors") +
-  theme_classic() + theme(aspect.ratio = 1) + scale_x_continuous(trans = "sqrt")
+```{R, fig.width = 4, fig.height = 3, warning = FALSE, message = FALSE}
+ggplot(subset(df, diag == TRUE & seed == 123), aes(x = alpha, y = mean_angle, color = penalty)) +
+  geom_point() + labs(x = "alpha", y = "mean cosine angle\nbetween factors") +
+  theme_classic() + theme(aspect.ratio = 1) + scale_x_continuous(trans = "sqrt") +
+  stat_smooth(se = F)
 ```
+
+Now let's take a look at how L1 and L2 penalties affect the sparsity of factors, and also calculate the similarity of these models to a k-means clustering or the first singular vector (given by a rank-1 NMF):
 
 We can see that L1 penalty increases the distance between factors, while L2 penalty increases the similarity between factors.
 
-How do these models differ from a practical perspective?
+```{R, fig.width = 7, fig.height = 3, echo = FALSE, warning = FALSE, message = FALSE}
+ggplot(subset(df, diag == TRUE & seed == 123), aes(x = sparsity, y = alpha, color = color)) + geom_point(size = 2) + theme_classic() +
+  theme(aspect.ratio = 1) + 
+  scale_y_continuous(trans = 'log10') +
+  scale_color_gradient2(low = "#ff0000",
+                        mid = "#cccccc",
+                        high = "#0000ff",
+                        breaks=c(-1,0,1),
+                        labels=c("L1 = 1",0,"L2 = 1"),
+                        limits=c(-1,1)) +
+  labs(y = "alpha", x = "sparsity of 'w'")
+```
+
+L1 is sparsifying while L2 is densifying.
+
+```{R, fig.width = 7, fig.height = 3, echo = FALSE, warning = FALSE, message = FALSE}
+p2 <- ggplot(subset(df, penalty != "none" & diag == TRUE & seed == 123), aes(x = alpha, y = kmeans, color = factor(penalty))) + geom_point(size = 2) + theme_classic() +
+  theme(aspect.ratio = 1) + geom_smooth(se = F) +
+  scale_x_continuous(trans = 'log10') +
+  labs(y = "similarity of factor model\nto k-means clustering", x = "alpha") +
+  guides(color = guide_legend(title = "penalty"))
+
+p3 <- ggplot(subset(df, penalty != "none" & diag == TRUE & seed == 123), aes(x = alpha, y = svd1, color = factor(penalty))) + geom_point(size = 2) + theme_classic() +
+  theme(aspect.ratio = 1) + geom_smooth(se = F) +
+  scale_x_continuous(trans = 'log10') +
+  labs(y = "mean similarity of all factors\nto first singular vector", x = "alpha") +
+  guides(color = guide_legend(title = "penalty"))
+
+plot_grid(p2 + theme(legend.position = "none"), p3 + theme(legend.position = "none"), get_legend(p2), nrow = 1, rel_widths = c(1, 1, 0.4))
+```
+
+Here, L1 promotes a k-means clustering model while L2 promotes convergence towards the first singular vector.
+
+How do these L1- and L2-regularized models differ in terms of information?
 
 ## Interpreting L1- and L2-regularized factor models
 
@@ -243,7 +252,7 @@ Similar information is clearly being captured by each of the models, but let's s
 
 We'll align factors in the regularized models to the unregularized models, and then compare specific factors.
 
-```{R, warning = FALSE, fig.width = 6, fig.height = 6}
+```{R, warning = FALSE}
 library(ggrepel)
 biplot <- function(model1, model2, factor){
   df <- data.frame("model1" = model1$w[, factor], "model2" = model2$w[, factor], "label" = rownames(model1$w))
@@ -252,7 +261,9 @@ biplot <- function(model1, model2, factor){
 
 model_L1 <- align(model_L1, model)
 model_L2 <- align(model_L2, model)
+```
 
+```{R, warning = FALSE, message = FALSE, fig.width = 6, fig.height = 6, echo = FALSE}
 p1 <- biplot(model, model_L1, 1) + labs(x = "No penalty", y = "L1 = 0.2") + 
   theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5)) + ggtitle("factor 1")
 p2 <- biplot(model, model_L1, 8) + labs(x = "No penalty", y = "L1 = 0.2") + 

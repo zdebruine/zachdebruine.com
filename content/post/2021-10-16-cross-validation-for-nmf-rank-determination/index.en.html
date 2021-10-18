@@ -1,0 +1,155 @@
+---
+title: Cross-validation for NMF rank determination
+author: Zach DeBruine
+date: '2021-10-17'
+slug: cross-validation-for-nmf-rank-determination
+categories:
+  - NMF
+  - methods
+tags:
+  - NMF
+  - cross-validation
+subtitle: 'Four methods for cross-validation of non-negative matrix factorizations'
+summary: 'In this post I review four distinctly different methods for cross-validation of NMF, each with strengths and weaknesses for different applications, and discuss how to use these methods effectively.'
+featured: no
+image:
+  caption: ''
+  focal_point: ''
+  preview_only: yes
+---
+
+
+
+<div id="cross-validation-for-nmf" class="section level2">
+<h2>Cross-Validation for NMF</h2>
+<p>Rank is the most important hyperparameter in NMF. Finding that “sweet spot” rank can make the difference between learning a useful model that captures meaningful signal (but not noise) or learning a garbage model that misses good signal or focuses too much on useless noise.</p>
+<p>Alex Williams has posted a great introduction to cross-validation for NMF on his <a href="http://alexhwilliams.info/itsneuronalblog/2018/02/26/crossval/">blog</a>. His review of the first two methods is particularly intuitive. However, the third method is both theoretically questionable and poor in practice.</p>
+<p>There are three “unsupervised” cross-validation methods for NMF which I have found to be useful:</p>
+<ul>
+<li><strong>Bi-cross-validation</strong>, proposed by <a href="https://projecteuclid.org/journals/annals-of-applied-statistics/volume-3/issue-2/Bi-cross-validation-of-the-SVD-and-the/10.1214/08-AOAS227.full">Perry</a> and explained simply by <a href="http://alexhwilliams.info/itsneuronalblog/2018/02/26/crossval/">Williams</a>. The “Bi-” in “Bi-cross-validation” means that the model is trained on a block of randomly selected samples and features and evaluated on a non-intersecting block of samples and features. Thus, no samples or features in the test set are included in the training set. If the test and training sets contain samples in common, or features in common, NMF gets to “cheat” in training and directly infer patterns of regulation, and thus basic subsample-cross-validation with NMF does not work.</li>
+<li><strong>Imputation</strong>, described nicely by <a href="https://bmcbioinformatics.biomedcentral.com/articles/10.1186/s12859-019-3312-5">Lin</a> and also reviewed in this StackExchange post by <a href="https://stats.stackexchange.com/questions/111205/how-to-choose-an-optimal-number-of-latent-factors-in-non-negative-matrix-factori">amoeba</a>. Here, a small fraction of values (i.e. 5%) are “masked” and considered as missing during factorization, and the mean squared error of the imputed values is calculated after model training.</li>
+<li><strong>Robustness</strong> is simply the cosine similarity of matched factors in independent models trained on non-overlapping sample sets. The premise is that noise capture will result in low similarity, while efficient signal capture will result in high similarity. Furthermore, approximations which are too low-rank will not classify signals in the same manner, leading to poor factor matching.</li>
+</ul>
+</div>
+<div id="takeaways" class="section level2">
+<h2>Takeaways</h2>
+<ul>
+<li>The <code>project</code> method (bi-cross-validation) is useful for well-conditioned signal.</li>
+<li>The <code>robust</code> method (similarity of independent factorizations) is generally the most informative for noisy data possibly suffering from signal dropout.</li>
+<li>The <code>imputation</code> method is the slowest of the three, but generally the most sensitive.</li>
+</ul>
+</div>
+<div id="install-rcppml" class="section level2">
+<h2>Install RcppML</h2>
+<p>Install the development version of RcppML:</p>
+<pre class="r"><code>devtools::install_github(&quot;zdebruine/RcppML&quot;)</code></pre>
+<pre class="r"><code>library(RcppML)
+library(ggplot2)
+library(cowplot)
+library(umap)
+library(irlba)</code></pre>
+</div>
+<div id="simulated-data" class="section level2">
+<h2>Simulated data</h2>
+<p>Simulated data is useful for demonstrating the utility of methods in response to adversarial perturbations such as noise or dropout.</p>
+<p>We will first explore cross-validation using two simulated datasets generated with <code>simulateNMF</code>:</p>
+<ol style="list-style-type: decimal">
+<li><code>data_clean</code> will have no noise or signal dropout</li>
+<li><code>data_dirty</code> contains the same signal as <code>data_clean</code>, but with a good amount of noise and dropout.</li>
+</ol>
+<pre class="r"><code>data_clean &lt;- simulateNMF(nrow = 200, ncol = 200, k = 5, noise = 0, dropout = 0, seed = 123)
+data_dirty &lt;- simulateNMF(nrow = 200, ncol = 200, k = 5, noise = 0.5, dropout = 0.5, seed = 123)</code></pre>
+<p>Notice how <code>data_clean</code> contains only 5 non-zero singular values, while <code>data_dirty</code> does not:</p>
+<p><img src="{{< blogdown/postref >}}index.en_files/figure-html/unnamed-chunk-2-1.png" width="240" style="display: block; margin: auto auto auto 0;" /></p>
+<p>We can use <code>RcppML::crossValidate</code> to determine the rank of each dataset. The default method uses “bi-cross-validation”. See <code>?crossValidate</code> for details.</p>
+<pre class="r"><code>cv_clean &lt;- crossValidate(data_clean, k = 1:10, method = &quot;predict&quot;, reps = 3, seed = 123)
+cv_dirty &lt;- crossValidate(data_dirty, k = 1:10, method = &quot;predict&quot;, reps = 3, seed = 123)
+plot_grid(
+  plot(cv_clean) + ggtitle(&quot;bi-cross-validation on\nclean dataset&quot;),
+  plot(cv_dirty) + ggtitle(&quot;bi-cross-validation on\ndirty dataset&quot;), nrow = 1)</code></pre>
+<p><img src="{{< blogdown/postref >}}index.en_files/figure-html/unnamed-chunk-3-1.png" width="576" style="display: block; margin: auto auto auto 0;" /></p>
+<p><code>crossValidate</code> also supports another method which compares robustness of two factorizations on independent sample subsets.</p>
+<pre class="r"><code>cv_clean &lt;- crossValidate(data_clean, k = 1:10, method = &quot;robust&quot;, reps = 3, seed = 123)
+cv_dirty &lt;- crossValidate(data_dirty, k = 1:10, method = &quot;robust&quot;, reps = 3, seed = 123)
+plot_grid(
+  plot(cv_clean) + ggtitle(&quot;robust cross-validation on\nclean dataset&quot;),
+  plot(cv_dirty) + ggtitle(&quot;robust cross-validation on\ndirty dataset&quot;), nrow = 1)</code></pre>
+<p><img src="{{< blogdown/postref >}}index.en_files/figure-html/unnamed-chunk-4-1.png" width="576" style="display: block; margin: auto auto auto 0;" /></p>
+<p>This second method does better on ill-conditioned data because it measures the robustness between independent factorizations.</p>
+<p>Finally, we can use the <code>impute</code> method:</p>
+<pre class="r"><code>cv_clean &lt;- crossValidate(data_clean, k = 1:10, method = &quot;impute&quot;, reps = 3, seed = 123)
+cv_dirty &lt;- crossValidate(data_dirty, k = 1:10, method = &quot;impute&quot;, reps = 3, seed = 123)
+plot_grid(
+  plot(cv_clean) + ggtitle(&quot;impute cross-validation on\nclean dataset&quot;) + scale_y_continuous(trans = &quot;log10&quot;),
+  plot(cv_dirty) + ggtitle(&quot;impute cross-validation on\ndirty dataset&quot;) + scale_y_continuous(trans = &quot;log10&quot;), nrow = 1)</code></pre>
+<p><img src="{{< blogdown/postref >}}index.en_files/figure-html/unnamed-chunk-5-1.png" width="576" style="display: block; margin: auto auto auto 0;" /></p>
+<p>For real datasets, it is important to experiment with both cross-validation methods and to explore multi-resolution analysis or other objectives where appropriate.</p>
+<p>Let’s take a look at a real dataset:</p>
+</div>
+<div id="finding-the-rank-of-the-hawaiibirds-dataset" class="section level2">
+<h2>Finding the rank of the <code>hawaiibirds</code> dataset</h2>
+<pre class="r"><code>data(hawaiibirds)
+A &lt;- hawaiibirds$counts
+cv_predict &lt;- crossValidate(A, k = 1:20, method = &quot;predict&quot;, reps = 3, seed = 123)
+cv_robust &lt;- crossValidate(A, k = 1:20, method = &quot;robust&quot;, reps = 3, seed = 123)
+cv_impute &lt;- crossValidate(A, k = 1:20, method = &quot;impute&quot;, reps = 3, seed = 123)
+plot_grid(
+  plot(cv_predict) + ggtitle(&quot;method = &#39;predict&#39;&quot;) + theme(legend.position = &quot;none&quot;),
+  plot(cv_robust) + ggtitle(&quot;method = &#39;robust&#39;&quot;) + theme(legend.position = &quot;none&quot;),
+  plot(cv_impute) + ggtitle(&quot;method = &#39;impute&#39;&quot;) + scale_y_continuous(trans = &quot;log10&quot;) + theme(legend.position = &quot;none&quot;),
+  get_legend(plot(cv_predict)), rel_widths = c(1, 1, 1, 0.4), nrow = 1, labels = &quot;auto&quot;)</code></pre>
+<p><img src="{{< blogdown/postref >}}index.en_files/figure-html/unnamed-chunk-6-1.png" width="768" style="display: block; margin: auto auto auto 0;" /></p>
+</div>
+<div id="finding-the-rank-of-the-aml-dataset" class="section level2">
+<h2>Finding the rank of the <code>aml</code> dataset</h2>
+<pre class="r"><code>data(aml)
+cv_impute &lt;- crossValidate(aml, k = 2:14, method = &quot;impute&quot;, reps = 3, seed = 123)
+plot(cv_impute) + scale_y_continuous(trans = &quot;log10&quot;)</code></pre>
+<p><img src="{{< blogdown/postref >}}index.en_files/figure-html/unnamed-chunk-7-1.png" width="768" style="display: block; margin: auto auto auto 0;" /></p>
+</div>
+<div id="technical-considerations" class="section level2">
+<h2>Technical considerations</h2>
+<p>Runtime is a major consideration for large datasets. Unfortunately, missing value imputation can be very slow.</p>
+</div>
+<div id="perturb" class="section level2">
+<h2>Perturb</h2>
+<p>Compare missing value imputation with perturb (zeros) and perturb (random):</p>
+<pre class="r"><code>data(hawaiibirds)
+data(aml)
+data(movielens)
+library(Seurat)</code></pre>
+<pre><code>## Warning: package &#39;Seurat&#39; was built under R version 4.0.5</code></pre>
+<pre><code>## Attaching SeuratObject</code></pre>
+<pre class="r"><code>library(SeuratData)</code></pre>
+<pre><code>## Registered S3 method overwritten by &#39;cli&#39;:
+##   method     from         
+##   print.boxx spatstat.geom</code></pre>
+<pre><code>## -- Installed datasets ------------------------------------- SeuratData v0.2.1 --</code></pre>
+<pre><code>## v bmcite       0.3.0                    v pbmc3k       3.1.4
+## v hcabm40k     3.0.0                    v pbmcMultiome 0.1.0
+## v ifnb         3.1.0                    v pbmcsca      3.0.0
+## v panc8        3.0.2                    v stxBrain     0.1.1</code></pre>
+<pre><code>## -------------------------------------- Key -------------------------------------</code></pre>
+<pre><code>## v Dataset loaded successfully
+## &gt; Dataset built with a newer version of Seurat than installed
+## (?) Unknown version of Seurat installed</code></pre>
+<pre class="r"><code>pbmc3k</code></pre>
+<pre><code>## An object of class Seurat 
+## 13714 features across 2700 samples within 1 assay 
+## Active assay: RNA (13714 features, 0 variable features)</code></pre>
+<pre class="r"><code>A &lt;- pbmc3k@assays$RNA@counts
+
+n &lt;- 0.2
+method = &quot;impute&quot;
+cv1 &lt;- crossValidate(A, k = 1:15, method = method, reps = 3, seed = 123, perturb_to = &quot;random&quot;, n = n)
+cv2 &lt;- crossValidate(aml, k = 1:15, method = method, reps = 3, seed = 123, perturb_to = &quot;random&quot;, n = n)
+cv3 &lt;- crossValidate(movielens$ratings, k = 1:15, method = method, reps = 3, seed = 123, perturb_to = &quot;random&quot;, n = n)
+cv4 &lt;- crossValidate(hawaiibirds$counts, k = 1:15, method = method, reps = 3, seed = 123, perturb_to = &quot;random&quot;, n = n)
+plot_grid(
+  plot(cv1) + theme(legend.position = &quot;none&quot;) + scale_y_continuous(trans = &quot;log10&quot;),
+  plot(cv2) + theme(legend.position = &quot;none&quot;) + scale_y_continuous(trans = &quot;log10&quot;),
+  plot(cv3) + theme(legend.position = &quot;none&quot;) + scale_y_continuous(trans = &quot;log10&quot;),
+  plot(cv4) + theme(legend.position = &quot;none&quot;) + scale_y_continuous(trans = &quot;log10&quot;),
+  nrow = 2)</code></pre>
+<p><img src="{{< blogdown/postref >}}index.en_files/figure-html/unnamed-chunk-8-1.png" width="768" style="display: block; margin: auto auto auto 0;" /></p>
+</div>
