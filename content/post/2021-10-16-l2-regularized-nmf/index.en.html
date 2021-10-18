@@ -1,5 +1,5 @@
 ---
-title: "Making sense of L1- and L2-regularized NMF"
+title: "Statistical properties of L1- and L2-regularized NMF"
 author: "Zach DeBruine"
 date: '2021-10-18'
 slug: l2-regularized-nmf
@@ -10,9 +10,8 @@ tags:
 - NMF
 - regularization
 - L2
-subtitle: Statistical properties of L1- and L2-regularized NMF
-summary: L1 and L2 regularized NMF has special properties which control the information
-  in the NMF model. Here I show how L1 is a sparsifying regularization that promotes
+subtitle: An intuitive take on what exactly L1- and L2-regularized NMF actually does
+summary: L1- and L2-regularized non-negative matrix factorizations have special properties. Here I show how L1 is a sparsifying regularization that promotes
   a k-means clustering-like model, while L2 is a densifying regularization that promotes
   convergence of all factors towards the first singular vector.
 featured: no
@@ -26,11 +25,13 @@ image:
 
 <div id="key-takeaways" class="section level2">
 <h2>Key Takeaways</h2>
-<p>For non-negative matrix factorization:
-* L1 and L2 regularization require diagonalization (factorization of the form <span class="math inline">\(A = wdh\)</span>)
-* L1 is a sparsifying, L2 is densifying
-* L1 increases angle between factors, L2 decreases angle between factors
-* L1 penalties cause factors to converge collectively towards a k-means clustering model, L2 penalties cause each factor to converge individually towards the first singular vector</p>
+<p>For non-negative matrix factorization:</p>
+<ul>
+<li>L1 and L2 regularization require diagonalization (factorization of the form <span class="math inline">\(A = wdh\)</span>)</li>
+<li>L1 is a sparsifying, L2 is densifying</li>
+<li>L1 increases angle between factors, L2 decreases angle between factors</li>
+<li>L1 penalties cause factors to converge collectively towards a k-means clustering model, L2 penalties cause each factor to converge individually towards the first singular vector</li>
+</ul>
 </div>
 <div id="regularizing-nmf" class="section level2">
 <h2>Regularizing NMF</h2>
@@ -60,7 +61,7 @@ These equations are in the form <span class="math inline">\(ax = b\)</span>. For
 </div>
 <div id="diagonalized-nmf-enables-convex-regularization" class="section level2">
 <h2>Diagonalized NMF enables convex regularization</h2>
-<p>Let’s load the <code>hawaiibirds</code> dataset and factorize the data at all L1 and L2 penalties between 0 and 0.99, at increments of 0.01. We will do so with and without model diagonalization to observe what happens. Our measure of interest is the mean sparsity of the <span class="math inline">\(w\)</span> and <span class="math inline">\(h\)</span> models.</p>
+<p>Let’s load the <code>hawaiibirds</code> dataset and factorize the data at several L1 and L2 penalties, with and without model diagonalization, also calculating various statistics such as sparsity, similarity to k-means clustering, and similarity to the first singular vector.</p>
 <pre class="r"><code># devtools::install_github(&quot;zdebruine/RcppML&quot;)
 library(RcppML)
 data(hawaiibirds)
@@ -105,7 +106,6 @@ df$seed &lt;- factor(df$seed)</code></pre>
 <li>L1 regularization increases sparsity of factor models (<strong>b</strong>) while L2 regularization promotes density of the model (<strong>d</strong>)</li>
 <li>L1 = 1 guarantees complete sparsity (<strong>b</strong>) while L2 = 1 guarantees complete density (<strong>d</strong>)</li>
 </ul>
-<p>Not shown here, diagonal scaling also ensures factors are equally affected by the regularization, rather than factors which explain most of the MSE remaining unaffected while lesser factors are driven to high sparsity.</p>
 <p>We might not have expected that L2 is a densifying factorization. Why is this? L2 convexly shrinks values towards zero, and as such decreases the condition number of <span class="math inline">\(a\)</span>. This means signals will be encouraged to “squash” together, and factors in the resulting model will begin to describe similar signal. As this occurs, the model naturally becomes denser until a point is reached that the objective is minimized (at convergence).</p>
 </div>
 <div id="properties-of-l1--and-l2-regularized-nmf" class="section level2">
@@ -120,13 +120,12 @@ df$seed &lt;- factor(df$seed)</code></pre>
   theme_classic() + theme(aspect.ratio = 1) + scale_x_continuous(trans = &quot;sqrt&quot;) +
   stat_smooth(se = F)</code></pre>
 <p><img src="{{< blogdown/postref >}}index.en_files/figure-html/unnamed-chunk-4-1.png" width="384" style="display: block; margin: auto auto auto 0;" /></p>
-<p>Now let’s take a look at how L1 and L2 penalties affect the sparsity of factors, and also calculate the similarity of these models to a k-means clustering or the first singular vector (given by a rank-1 NMF):</p>
 <p>We can see that L1 penalty increases the distance between factors, while L2 penalty increases the similarity between factors.</p>
+<p>Now let’s take a look at how L1 and L2 penalties affect the sparsity of factors, and also calculate the similarity of these models to a k-means clustering or the first singular vector (given by a rank-1 NMF):</p>
 <p><img src="{{< blogdown/postref >}}index.en_files/figure-html/unnamed-chunk-5-1.png" width="672" style="display: block; margin: auto auto auto 0;" /></p>
 <p>L1 is sparsifying while L2 is densifying.</p>
 <p><img src="{{< blogdown/postref >}}index.en_files/figure-html/unnamed-chunk-6-1.png" width="672" style="display: block; margin: auto auto auto 0;" /></p>
 <p>Here, L1 promotes a k-means clustering model while L2 promotes convergence towards the first singular vector.</p>
-<p>How do these L1- and L2-regularized models differ in terms of information?</p>
 </div>
 <div id="interpreting-l1--and-l2-regularized-factor-models" class="section level2">
 <h2>Interpreting L1- and L2-regularized factor models</h2>
@@ -149,4 +148,12 @@ model_L2 &lt;- align(model_L2, model)</code></pre>
 <p><img src="{{< blogdown/postref >}}index.en_files/figure-html/unnamed-chunk-10-1.png" width="576" style="display: block; margin: auto auto auto 0;" /></p>
 <p>These are very harsh penalties, so notice how L1 can over-sparsify things, while L2 can generate factors that are so dense the information is hardly specific or informative.</p>
 <p>A happy medium for sparsifying (or densifying) regularization certainly exists, and this is an objective hyperparameter that must be determined against the objectives of the analysis. Unfortunately, there is nothing against which to optimize – this appears to be a matter of statistical taste.</p>
+</div>
+<div id="future-directions" class="section level2">
+<h2>Future directions</h2>
+<ul>
+<li>Effect of L1 and L2 regularizations on factorization rank</li>
+<li>Intuition behind one-sided L1 and L2 regularization</li>
+<li>Intuition behind combined L1/L2 or one-sided L1 vs. one-sided L2</li>
+</ul>
 </div>
