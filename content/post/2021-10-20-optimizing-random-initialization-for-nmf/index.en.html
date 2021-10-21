@@ -1,0 +1,215 @@
+---
+title: "Learning Optimal NMF Models from Random Restarts"
+author: "Zach DeBruine"
+date: '2021-10-20'
+slug: learning-optimal-nmf-models-from-random-restarts
+categories:
+- NMF
+- methods
+tags:
+- NMF
+- initialization
+subtitle: Initializing NMF with NNDSVD, random uniform, or random gaussian models
+summary: Finding the best discoverable solution for a non-negative matrix factorization
+  from a random initialization requires multiple random restarts. NNDSVD has previously
+  been proposed as a "head-start" for NMF, but I show that it is not always a head
+  start, and can be a dangerous local minima. I further explore the use of random
+  uniform or random gaussian models for NMF initialization.
+lastmod: '2021-10-20T11:28:55-04:00'
+featured: no
+image:
+  caption: ''
+  focal_point: ''
+  preview_only: yes
+---
+
+
+
+<div id="nmf-initialization" class="section level2">
+<h2>NMF Initialization</h2>
+<p>Non-negative matrix factorization (NMF) is NP-hard (<a href="https://arxiv.org/abs/0708.4149">Vavasis, 2007</a>). As such, the best that NMF can do, in practice, is find the best discoverable local minima from some set of initializations.</p>
+<p>Non-negative Double SVD (NNDSVD) has previously been proposed as a “head-start” for NMF (<a href="https://www.sciencedirect.com/science/article/abs/pii/S0031320307004359">Boutsidis, 2008</a>). However, SVD and NMF are usually nothing alike, as SVD factors are sequentially interdependent while NMF factors are colinearly interdependent. Thus, whether “non-negative” SVD is useful remains unclear.</p>
+<p>Random initializations are the most popular and promising method for NMF initialization. It is generally useful to attempt many random initializations to discover the best possible solution.</p>
+<p>In this post I explore a number of initializations on the <code>hawaiibirds</code>, <code>aml</code>, and <code>movielens</code> datasets, and a small single-cell dataset.</p>
+</div>
+<div id="takeaways" class="section level2">
+<h2>Takeaways</h2>
+<ul>
+<li>SVD-based initializations (such as NNDSVD) are slower than random initializations, sometimes do worse, and are never better.</li>
+<li>Multiple random initializations are useful for recovering the best discoverable NMF solution.</li>
+<li>Normal random distributions (i.e. <code>rnorm(mean = 2, sd = 1)</code>) slightly outperform uniform random distributions (i.e. <code>runif(min = 1, max = 2)</code>) at finding the best NMF solution.</li>
+</ul>
+</div>
+<div id="non-negative-double-svd" class="section level2">
+<h2>Non-negative Double SVD</h2>
+<p>The following is an implementation of NNDSVD, adapted from the <a href="https://github.com/renozao/NMF/blob/master/R/seed-nndsvd.R">NMF package</a>. In this function, the use of <code>irlba</code> is a key performance improvement, and we do not do any form of zero-filling as I have found that this does not affect the outcome of RcppML NMF:</p>
+<pre class="r"><code>nndsvd &lt;- function(data, k) {
+
+  .pos &lt;- function(x) { as.numeric(x &gt;= 0) * x }
+  .neg &lt;- function(x) {-as.numeric(x &lt; 0) * x }
+  .norm &lt;- function(x) { sqrt(drop(crossprod(x))) }
+
+  w = matrix(0, nrow(data), k)
+  s = irlba::irlba(data, k)
+  w[, 1] = sqrt(s$d[1]) * abs(s$u[, 1])
+
+  # second SVD for the other factors
+  for (i in 2:k) {
+    uu = s$u[, i]
+    vv = s$v[, i]
+    uup = .pos(uu)
+    uun = .neg(uu)
+    vvp = .pos(vv)
+    vvn = .neg(vv)
+    n_uup = .norm(uup)
+    n_vvp = .norm(vvp)
+    n_uun = .norm(uun)
+    n_vvn = .norm(vvn)
+    termp = as.double(n_uup %*% n_vvp)
+    termn = as.double(n_uun %*% n_vvn)
+    if (termp &gt;= termn) {
+      w[, i] = (s$d[i] * termp)^0.5 * uup / n_uup
+    } else {
+      w[, i] = (s$d[i] * termn)^0.5 * uun / n_uun
+    }
+  }
+  w
+}</code></pre>
+<p>We can compare NNDSVD to normal SVD:</p>
+<pre class="r"><code>library(irlba)
+library(RcppML)
+library(ggplot2)
+data(hawaiibirds)
+A &lt;- hawaiibirds$counts
+m1 &lt;- nndsvd(A, 2)
+m2 &lt;- irlba(A, 2)
+df &lt;- data.frame(&quot;svd2&quot; = m2$u[,2], &quot;nndsvd2&quot; = m1[,2])
+ggplot(df, aes(x = svd2, y = nndsvd2)) + 
+  geom_point() + 
+  labs(x = &quot;second singular vector&quot;, y = &quot;second NNDSVD vector&quot;) + 
+  theme_classic()</code></pre>
+<p><img src="{{< blogdown/postref >}}index.en_files/figure-html/unnamed-chunk-2-1.png" width="240" style="display: block; margin: auto auto auto 0;" /></p>
+<p>We might also derive a much simpler form of NNDSVD which simply sets negative values in $u to zero:</p>
+<pre class="r"><code>nndsvd2 &lt;- function(data, k){
+  w &lt;- irlba(data, k)$u
+  svd1 &lt;- abs(w[,1])
+  w[w &lt; 0] &lt;- 0
+  w[,1] &lt;- svd1
+  w
+}</code></pre>
+<p>Finally, we could simply initialize with the signed SVD, and let NMF take care of imposing the non-negativity constraints:</p>
+<pre class="r"><code>w_svd &lt;- function(data, k){
+  irlba(data, k)$u
+}</code></pre>
+</div>
+<div id="random-initializations" class="section level2">
+<h2>Random Initializations</h2>
+<p>We can test different random initializations using <code>runif</code> and <code>rnorm</code>. Hyperparameters to <code>runif</code> are <code>min</code> and <code>max</code>, while hyperparameters to <code>rnorm</code> are <code>mean</code> and <code>sd</code>. In both cases, our matrix must be non-negative.</p>
+<pre class="r"><code>w_runif &lt;- function(nrow, k, min, max, seed){
+  set.seed(seed)
+  matrix(runif(nrow * k, min, max), nrow, k)
+}
+
+w_rnorm &lt;- function(nrow, k, mean, sd, seed){
+  set.seed(seed)
+  abs(matrix(rnorm(nrow * k, mean, sd), nrow, k))
+}</code></pre>
+<p>Generate some initial <code>w</code> matrices using these functions:</p>
+<pre class="r"><code>library(cowplot)
+w1 &lt;- w_runif(nrow(A), 10, 0, 1, 123)
+w2 &lt;- w_runif(nrow(A), 10, 1, 2, 123)
+w3 &lt;- w_rnorm(nrow(A), 10, 0, 1, 123)
+w4 &lt;- w_rnorm(nrow(A), 10, 2, 1, 123)</code></pre>
+<p>See how the distributions of these different models differ:</p>
+<p><img src="{{< blogdown/postref >}}index.en_files/figure-html/unnamed-chunk-7-1.png" width="480" style="display: block; margin: auto auto auto 0;" /></p>
+</div>
+<div id="evaluating-initialization-methods" class="section level2">
+<h2>Evaluating initialization methods</h2>
+<p>We’ll use Mean Squared Error as a simple evaluation metric. We will compare results across several different datasets, as signal complexity can have a profound effect on recoverable NMF solution minima.</p>
+<div id="hawaiibirds-dataset" class="section level3">
+<h3><code>hawaiibirds</code> dataset</h3>
+<p>First, we’ll look at the hawaii birds dataset. Since this is a small dataset, we will run 50 replicates of each random initialization to 100 iterations.</p>
+<pre class="r"><code>data(hawaiibirds)
+results &lt;- eval_initializations(
+  hawaiibirds$counts, k = 10, n_reps = 50, tol = 1e-10, maxit = 100)</code></pre>
+<p><img src="{{< blogdown/postref >}}index.en_files/figure-html/unnamed-chunk-11-1.png" width="432" style="display: block; margin: auto auto auto 0;" /></p>
+<p>UMAP plot of all models learned for each initialization:</p>
+<p><img src="{{< blogdown/postref >}}index.en_files/figure-html/unnamed-chunk-12-1.png" width="288" style="display: block; margin: auto auto auto 0;" /></p>
+<p>Clearly, <code>rnorm(mean = 2, sd = 1)</code> has discovered a local minima that was not discovered by any other initialization method. Strikingly, it has done so while running faster than other methods.</p>
+</div>
+<div id="movielens-dataset" class="section level3">
+<h3><code>movielens</code> dataset</h3>
+<p>For this dataset, we will mask zeros, because 0’s indicate movies that have not been rated by the corresponding users.</p>
+<p>We will stop factorizations at <code>tol = 1e-5</code> and also track the number of iterations needed to get to that point.</p>
+<pre class="r"><code>data(movielens)
+results &lt;- eval_initializations(
+  movielens$ratings, k = 7, n_reps = 10, tol = 1e-5, maxit = 1000, mask = &quot;zeros&quot;)</code></pre>
+<p><img src="{{< blogdown/postref >}}index.en_files/figure-html/unnamed-chunk-14-1.png" width="624" style="display: block; margin: auto auto auto 0;" /></p>
+<p>UMAP plot of the learned models:</p>
+<p><img src="{{< blogdown/postref >}}index.en_files/figure-html/unnamed-chunk-15-1.png" width="288" style="display: block; margin: auto auto auto 0;" /></p>
+<p>Models here are much more similar, but <code>rnorm</code> still does surprisingly well, requires surprisingly few iterations, and is quite fast. Almost entirely on-par with this initialization is <code>nndsvd</code>.</p>
+</div>
+<div id="aml-dataset" class="section level3">
+<h3><code>aml</code> dataset</h3>
+<pre class="r"><code>data(aml)
+results &lt;- eval_initializations(aml, k = 10, n_reps = 25, tol = 1e-5)</code></pre>
+<p><img src="{{< blogdown/postref >}}index.en_files/figure-html/unnamed-chunk-17-1.png" width="624" style="display: block; margin: auto auto auto 0;" /></p>
+<p>and a UMAP plot of the learned models:</p>
+<p><img src="{{< blogdown/postref >}}index.en_files/figure-html/unnamed-chunk-18-1.png" width="288" style="display: block; margin: auto auto auto 0;" /></p>
+</div>
+<div id="single-cell-data" class="section level3">
+<h3>Single-cell data</h3>
+<p>Let’s have a look at the pbmc3k dataset made available in the <code>SeuratData</code> package. This dataset is an example of complex signal with significant dropout and noise.</p>
+<pre class="r"><code>library(Seurat)
+library(SeuratData)
+pbmc3k</code></pre>
+<pre><code>## An object of class Seurat 
+## 13714 features across 2700 samples within 1 assay 
+## Active assay: RNA (13714 features, 0 variable features)</code></pre>
+<pre class="r"><code>pbmc &lt;- pbmc3k@assays$RNA@counts
+results_pbmc3k &lt;- eval_initializations(pbmc, k = 7, n_reps = 20, tol = 1e-5)</code></pre>
+<p><img src="{{< blogdown/postref >}}index.en_files/figure-html/unnamed-chunk-21-1.png" width="624" style="display: block; margin: auto auto auto 0;" /></p>
+<p><img src="{{< blogdown/postref >}}index.en_files/figure-html/unnamed-chunk-22-1.png" width="288" style="display: block; margin: auto auto auto 0;" /></p>
+</div>
+<div id="normalized-single-cell-data" class="section level3">
+<h3>Normalized Single-Cell Data</h3>
+<p>Log-normalize single cell data and see how these changes in the distribution affect the ideal initialization method:</p>
+<pre class="r"><code>pbmc_norm &lt;- LogNormalize(pbmc)
+results_pbmc_norm &lt;- eval_initializations(pbmc_norm, k = 7, n_reps = 20, tol = 1e-5)</code></pre>
+<p><img src="{{< blogdown/postref >}}index.en_files/figure-html/unnamed-chunk-24-1.png" width="624" style="display: block; margin: auto auto auto 0;" /></p>
+<p><img src="{{< blogdown/postref >}}index.en_files/figure-html/unnamed-chunk-25-1.png" width="288" style="display: block; margin: auto auto auto 0;" /></p>
+</div>
+</div>
+<div id="takeaways-so-far" class="section level2">
+<h2>Takeaways so far</h2>
+<p><strong>Runtime:</strong>
+* <code>rnorm</code> and <code>runif</code>. Consistently faster than SVD-based initializations. There is no convincing difference between <code>rnorm</code> and <code>runif</code>.</p>
+<p><strong>Loss:</strong>
+* with multiple starts, <code>rnorm(2, 1)</code> never does worse than any other method, but performs worse on average than <code>runif</code> in single-cell data.
+* <code>nndsvd</code> performs as well as <code>runif</code> in <code>aml</code> and single-cell data, but takes longer. It performs worse than <code>runif</code> in <code>movielens</code> data (by a lot), and better than <code>runif</code> in hawaiibirds (but not as well as <code>rnorm</code>)</p>
+<p><strong>Iterations:</strong>
+* <code>runif</code> does at least as well as, or better than, all other methods.</p>
+<p>Spectral decompositions such as <code>nndsvd</code> do not out-perform random initialization-based methods such as <code>rnorm</code> or <code>runif</code> consistently. In addition, they require that an SVD be run, which increases the total runtime.</p>
+</div>
+<div id="optimizing-runif" class="section level2">
+<h2>Optimizing runif</h2>
+<p>It is possible that changing the bounds of the uniform distribution may affect the results.</p>
+<p>We will address whether the width of the bounds matters, and the proximity of the lower-bound to zero. We will look at bounds in the range (0, 1), (0, 2), (0, 10), (1, 2), (1, 10), and (2, 10):</p>
+<pre class="r"><code>results_hibirds &lt;- eval_runif(hawaiibirds$counts, k = 10, n_reps = 20, tol = 1e-6)
+results_aml &lt;- eval_runif(aml, k = 12, n_reps = 20)
+results_movielens &lt;- eval_runif(movielens$ratings, k = 7, n_reps = 20, mask = &quot;zeros&quot;)
+results_pbmc &lt;- eval_runif(pbmc, k = 7, n_reps = 20)</code></pre>
+<p><img src="{{< blogdown/postref >}}index.en_files/figure-html/unnamed-chunk-28-1.png" width="576" style="display: block; margin: auto auto auto 0;" /></p>
+<p>These results show no consistent recipe for finding the best minima, but that there is considerable dataset-specific variation.</p>
+<p>However, it is clear that varying the lower and upper bounds of <code>runif</code> across restarts is likely to be useful.</p>
+</div>
+<div id="optimizing-rnorm" class="section level2">
+<h2>Optimizing rnorm</h2>
+<p>Changing the mean and standard deviation of the absolute value of a normal distribution can generate non-normal distributions, in fact, it can generate distributions quite like a gamma distribution. Thus, we will investigate some different combinations of mean and standard deviation: (0, 0.5), (0, 1), (0, 2), (1, 0.5), (1, 1), and (2, 1):</p>
+<pre class="r"><code>results_hibirds &lt;- eval_rnorm(hawaiibirds$counts, k = 10, n_reps = 20, tol = 1e-6)
+results_aml &lt;- eval_rnorm(aml, k = 12, n_reps = 20)
+results_movielens &lt;- eval_rnorm(movielens$ratings, k = 7, n_reps = 20, mask = &quot;zeros&quot;)
+results_pbmc &lt;- eval_rnorm(pbmc, k = 7, n_reps = 20)</code></pre>
+<p><img src="{{< blogdown/postref >}}index.en_files/figure-html/unnamed-chunk-31-1.png" width="576" style="display: block; margin: auto auto auto 0;" /></p>
+<p>Here it’s more difficult to pick a winner, they really perform similarly. For the <code>pbmc3k</code> dataset, however, <code>rnorm(2,1)</code> is probably the best choice. This distribution is largely normal, as opposed to gamma (i.e. <code>rnorm(0, 0.5)</code>, which could be seen as the “loser”) or a lopsided bell-curve shaped (i.e. `rnorm(1, 1)).</p>
+</div>

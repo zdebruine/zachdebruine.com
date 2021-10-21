@@ -1,0 +1,178 @@
+---
+title: Cross-validation for NMF rank determination
+author: Zach DeBruine
+date: '2021-10-17'
+slug: cross-validation-for-nmf-rank-determination
+categories:
+  - NMF
+  - methods
+tags:
+  - NMF
+  - cross-validation
+subtitle: 'Four methods for cross-validation of non-negative matrix factorizations'
+summary: 'In this post I review four distinctly different methods for cross-validation of NMF, each with strengths and weaknesses for different applications, and discuss how to use these methods effectively.'
+featured: no
+image:
+  caption: ''
+  focal_point: ''
+  preview_only: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, fig.align = "left")
+```
+
+## Cross-Validation for NMF
+
+Rank is the most important hyperparameter in NMF. Finding that "sweet spot" rank can make the difference between learning a useful model that captures meaningful signal (but not noise) or learning a garbage model that misses good signal or focuses too much on useless noise.
+
+Alex Williams has posted a great introduction to cross-validation for NMF on his [blog](http://alexhwilliams.info/itsneuronalblog/2018/02/26/crossval/). His review of the first two methods is particularly intuitive. However, the third method is both theoretically questionable and poor in practice.
+
+There are three "unsupervised" cross-validation methods for NMF which I have found to be useful:
+
+* **Bi-cross-validation**, proposed by [Perry](https://projecteuclid.org/journals/annals-of-applied-statistics/volume-3/issue-2/Bi-cross-validation-of-the-SVD-and-the/10.1214/08-AOAS227.full) and explained simply by [Williams](http://alexhwilliams.info/itsneuronalblog/2018/02/26/crossval/). The "Bi-" in "Bi-cross-validation" means that the model is trained on a block of randomly selected samples and features and evaluated on a non-intersecting block of samples and features. Thus, no samples or features in the test set are included in the training set. If the test and training sets contain samples in common, or features in common, NMF gets to "cheat" in training and directly infer patterns of regulation, and thus basic subsample-cross-validation with NMF does not work.
+* **Imputation**, described nicely by [Lin](https://bmcbioinformatics.biomedcentral.com/articles/10.1186/s12859-019-3312-5) and also reviewed in this StackExchange post by [amoeba](https://stats.stackexchange.com/questions/111205/how-to-choose-an-optimal-number-of-latent-factors-in-non-negative-matrix-factori). Here, a small fraction of values (i.e. 5%) are "masked" and considered as missing during factorization, and the mean squared error of the imputed values is calculated after model training.
+* **Robustness** is simply the cosine similarity of matched factors in independent models trained on non-overlapping sample sets. The premise is that noise capture will result in low similarity, while efficient signal capture will result in high similarity. Furthermore, approximations which are too low-rank will not classify signals in the same manner, leading to poor factor matching.
+
+## Takeaways
+
+* The `project` method (bi-cross-validation) is useful for well-conditioned signal.
+* The `robust` method (similarity of independent factorizations) is generally the most informative for noisy data possibly suffering from signal dropout.
+* The `imputation` method is the slowest of the three, but generally the most sensitive.
+
+## Install RcppML
+
+Install the development version of RcppML:
+
+```{R install_stuff, eval = FALSE}
+devtools::install_github("zdebruine/RcppML")
+```
+
+```{R load_libraries, message = FALSE, warning = FALSE}
+library(RcppML)
+library(ggplot2)
+library(cowplot)
+library(umap)
+library(irlba)
+```
+
+## Simulated data
+
+Simulated data is useful for demonstrating the utility of methods in response to adversarial perturbations such as noise or dropout.
+
+We will first explore cross-validation using two simulated datasets generated with `simulateNMF`:
+
+1. `data_clean` will have no noise or signal dropout
+2. `data_dirty` contains the same signal as `data_clean`, but with a good amount of noise and dropout.
+
+```{R}
+data_clean <- simulateNMF(nrow = 200, ncol = 200, k = 5, noise = 0, dropout = 0, seed = 123)
+data_dirty <- simulateNMF(nrow = 200, ncol = 200, k = 5, noise = 0.5, dropout = 0.5, seed = 123)
+```
+
+Notice how `data_clean` contains only 5 non-zero singular values, while `data_dirty` does not:
+
+```{R, fig.width = 2.5, fig.height = 2.5, echo = FALSE}
+df <- data.frame("singular_value" = irlba(data_clean, 10)$d, "k" = 1:10, "dataset" = rep("clean", 10))
+df2 <- data.frame("singular_value" = irlba(data_dirty, 10)$d, "k" = 1:10, "dataset" = rep("dirty", 10))
+
+ggplot(rbind(df, df2), aes(x = k, y = singular_value, color = dataset)) + 
+  geom_point() + 
+  geom_line() + 
+  theme_classic() + 
+  scale_x_continuous(breaks = c(2, 4, 6, 8, 10)) + 
+  labs(x = "singular value", y = "standard deviation") +
+  theme(aspect.ratio = 1)
+```
+
+We can use `RcppML::crossValidate` to determine the rank of each dataset. The default method uses "bi-cross-validation". See `?crossValidate` for details.
+
+```{R, fig.width = 6, fig.height = 3}
+cv_clean <- crossValidate(data_clean, k = 1:10, method = "predict", reps = 3, seed = 123)
+cv_dirty <- crossValidate(data_dirty, k = 1:10, method = "predict", reps = 3, seed = 123)
+plot_grid(
+  plot(cv_clean) + ggtitle("bi-cross-validation on\nclean dataset"),
+  plot(cv_dirty) + ggtitle("bi-cross-validation on\ndirty dataset"), nrow = 1)
+```
+
+`crossValidate` also supports another method which compares robustness of two factorizations on independent sample subsets.
+
+```{R, fig.width = 6, fig.height = 3, warning = FALSE}
+cv_clean <- crossValidate(data_clean, k = 1:10, method = "robust", reps = 3, seed = 123)
+cv_dirty <- crossValidate(data_dirty, k = 1:10, method = "robust", reps = 3, seed = 123)
+plot_grid(
+  plot(cv_clean) + ggtitle("robust cross-validation on\nclean dataset"),
+  plot(cv_dirty) + ggtitle("robust cross-validation on\ndirty dataset"), nrow = 1)
+```
+
+This second method does better on ill-conditioned data because it measures the robustness between independent factorizations.
+
+Finally, we can use the `impute` method:
+
+```{R, fig.width = 6, fig.height = 3, warning = FALSE}
+cv_clean <- crossValidate(data_clean, k = 1:10, method = "impute", reps = 3, seed = 123)
+cv_dirty <- crossValidate(data_dirty, k = 1:10, method = "impute", reps = 3, seed = 123)
+plot_grid(
+  plot(cv_clean) + ggtitle("impute cross-validation on\nclean dataset") + scale_y_continuous(trans = "log10"),
+  plot(cv_dirty) + ggtitle("impute cross-validation on\ndirty dataset") + scale_y_continuous(trans = "log10"), nrow = 1)
+```
+
+For real datasets, it is important to experiment with both cross-validation methods and to explore multi-resolution analysis or other objectives where appropriate.
+
+Let's take a look at a real dataset:
+
+## Finding the rank of the `hawaiibirds` dataset
+
+```{R, fig.height = 2.5, fig.width = 8}
+data(hawaiibirds)
+A <- hawaiibirds$counts
+cv_predict <- crossValidate(A, k = 1:20, method = "predict", reps = 3, seed = 123)
+cv_robust <- crossValidate(A, k = 1:20, method = "robust", reps = 3, seed = 123)
+cv_impute <- crossValidate(A, k = 1:20, method = "impute", reps = 3, seed = 123)
+plot_grid(
+  plot(cv_predict) + ggtitle("method = 'predict'") + theme(legend.position = "none"),
+  plot(cv_robust) + ggtitle("method = 'robust'") + theme(legend.position = "none"),
+  plot(cv_impute) + ggtitle("method = 'impute'") + scale_y_continuous(trans = "log10") + theme(legend.position = "none"),
+  get_legend(plot(cv_predict)), rel_widths = c(1, 1, 1, 0.4), nrow = 1, labels = "auto")
+```
+
+## Finding the rank of the `aml` dataset
+
+```{R, fig.height = 2.5, fig.width = 8}
+data(aml)
+cv_impute <- crossValidate(aml, k = 2:14, method = "impute", reps = 3, seed = 123)
+plot(cv_impute) + scale_y_continuous(trans = "log10")
+```
+
+## Technical considerations
+
+Runtime is a major consideration for large datasets. Unfortunately, missing value imputation can be very slow.
+
+
+## Perturb
+
+Compare missing value imputation with perturb (zeros) and perturb (random):
+
+```{R, fig.height = 2.5, fig.width = 8}
+data(hawaiibirds)
+data(aml)
+data(movielens)
+library(Seurat)
+library(SeuratData)
+pbmc3k
+A <- pbmc3k@assays$RNA@counts
+
+n <- 0.2
+method = "impute"
+cv1 <- crossValidate(A, k = 1:15, method = method, reps = 3, seed = 123, perturb_to = "random", n = n)
+cv2 <- crossValidate(aml, k = 1:15, method = method, reps = 3, seed = 123, perturb_to = "random", n = n)
+cv3 <- crossValidate(movielens$ratings, k = 1:15, method = method, reps = 3, seed = 123, perturb_to = "random", n = n)
+cv4 <- crossValidate(hawaiibirds$counts, k = 1:15, method = method, reps = 3, seed = 123, perturb_to = "random", n = n)
+plot_grid(
+  plot(cv1) + theme(legend.position = "none") + scale_y_continuous(trans = "log10"),
+  plot(cv2) + theme(legend.position = "none") + scale_y_continuous(trans = "log10"),
+  plot(cv3) + theme(legend.position = "none") + scale_y_continuous(trans = "log10"),
+  plot(cv4) + theme(legend.position = "none") + scale_y_continuous(trans = "log10"),
+  nrow = 2)
+```
+

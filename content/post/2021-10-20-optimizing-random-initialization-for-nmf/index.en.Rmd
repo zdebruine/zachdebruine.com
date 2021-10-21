@@ -1,0 +1,556 @@
+---
+title: "Learning Optimal NMF Models from Random Restarts"
+author: "Zach DeBruine"
+date: '2021-10-20'
+slug: learning-optimal-nmf-models-from-random-restarts
+categories:
+- NMF
+- methods
+tags:
+- NMF
+- initialization
+subtitle: Initializing NMF with NNDSVD, random uniform, or random gaussian models
+summary: Finding the best discoverable solution for a non-negative matrix factorization
+  from a random initialization requires multiple random restarts. NNDSVD has previously
+  been proposed as a "head-start" for NMF, but I show that it is not always a head
+  start, and can be a dangerous local minima. I further explore the use of random
+  uniform or random gaussian models for NMF initialization.
+lastmod: '2021-10-20T11:28:55-04:00'
+featured: no
+image:
+  caption: ''
+  focal_point: ''
+  preview_only: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, fig.align = "left")
+```
+
+## NMF Initialization
+
+Non-negative matrix factorization (NMF) is NP-hard ([Vavasis, 2007](https://arxiv.org/abs/0708.4149)). As such, the best that NMF can do, in practice, is find the best discoverable local minima from some set of initializations.
+
+Non-negative Double SVD (NNDSVD) has previously been proposed as a "head-start" for NMF ([Boutsidis, 2008](https://www.sciencedirect.com/science/article/abs/pii/S0031320307004359)). However, SVD and NMF are usually nothing alike, as SVD factors are sequentially interdependent while NMF factors are colinearly interdependent. Thus, whether "non-negative" SVD is useful remains unclear.
+
+Random initializations are the most popular and promising method for NMF initialization. It is generally useful to attempt many random initializations to discover the best possible solution.
+
+In this post I explore a number of initializations on the `hawaiibirds`, `aml`, and `movielens` datasets, and a small single-cell dataset.
+
+## Takeaways
+
+* SVD-based initializations (such as NNDSVD) are slower than random initializations, sometimes do worse, and are never better.
+* Multiple random initializations are useful for recovering the best discoverable NMF solution.
+* Normal random distributions (i.e. `rnorm(mean = 2, sd = 1)`) slightly outperform uniform random distributions (i.e. `runif(min = 1, max = 2)`) at finding the best NMF solution.
+
+## Non-negative Double SVD
+
+The following is an implementation of NNDSVD, adapted from the [NMF package](https://github.com/renozao/NMF/blob/master/R/seed-nndsvd.R). In this function, the use of `irlba` is a key performance improvement, and we do not do any form of zero-filling as I have found that this does not affect the outcome of RcppML NMF:
+
+```{R}
+nndsvd <- function(data, k) {
+
+  .pos <- function(x) { as.numeric(x >= 0) * x }
+  .neg <- function(x) {-as.numeric(x < 0) * x }
+  .norm <- function(x) { sqrt(drop(crossprod(x))) }
+
+  w = matrix(0, nrow(data), k)
+  s = irlba::irlba(data, k)
+  w[, 1] = sqrt(s$d[1]) * abs(s$u[, 1])
+
+  # second SVD for the other factors
+  for (i in 2:k) {
+    uu = s$u[, i]
+    vv = s$v[, i]
+    uup = .pos(uu)
+    uun = .neg(uu)
+    vvp = .pos(vv)
+    vvn = .neg(vv)
+    n_uup = .norm(uup)
+    n_vvp = .norm(vvp)
+    n_uun = .norm(uun)
+    n_vvn = .norm(vvn)
+    termp = as.double(n_uup %*% n_vvp)
+    termn = as.double(n_uun %*% n_vvn)
+    if (termp >= termn) {
+      w[, i] = (s$d[i] * termp)^0.5 * uup / n_uup
+    } else {
+      w[, i] = (s$d[i] * termn)^0.5 * uun / n_uun
+    }
+  }
+  w
+}
+```
+
+We can compare NNDSVD to normal SVD:
+
+```{R, fig.width = 2.5, fig.height = 2.5, warning = F, message = F}
+library(irlba)
+library(RcppML)
+library(ggplot2)
+data(hawaiibirds)
+A <- hawaiibirds$counts
+m1 <- nndsvd(A, 2)
+m2 <- irlba(A, 2)
+df <- data.frame("svd2" = m2$u[,2], "nndsvd2" = m1[,2])
+ggplot(df, aes(x = svd2, y = nndsvd2)) + 
+  geom_point() + 
+  labs(x = "second singular vector", y = "second NNDSVD vector") + 
+  theme_classic()
+```
+
+We might also derive a much simpler form of NNDSVD which simply sets negative values in $u to zero:
+
+```{R}
+nndsvd2 <- function(data, k){
+  w <- irlba(data, k)$u
+  svd1 <- abs(w[,1])
+  w[w < 0] <- 0
+  w[,1] <- svd1
+  w
+}
+```
+
+Finally, we could simply initialize with the signed SVD, and let NMF take care of imposing the non-negativity constraints:
+
+```{R}
+w_svd <- function(data, k){
+  irlba(data, k)$u
+}
+```
+
+## Random Initializations
+
+We can test different random initializations using `runif` and `rnorm`. Hyperparameters to `runif` are `min` and `max`, while hyperparameters to `rnorm` are `mean` and `sd`. In both cases, our matrix must be non-negative.
+
+```{R}
+w_runif <- function(nrow, k, min, max, seed){
+  set.seed(seed)
+  matrix(runif(nrow * k, min, max), nrow, k)
+}
+
+w_rnorm <- function(nrow, k, mean, sd, seed){
+  set.seed(seed)
+  abs(matrix(rnorm(nrow * k, mean, sd), nrow, k))
+}
+```
+
+Generate some initial `w` matrices using these functions:
+
+```{R, warning = FALSE, message = FALSE}
+library(cowplot)
+w1 <- w_runif(nrow(A), 10, 0, 1, 123)
+w2 <- w_runif(nrow(A), 10, 1, 2, 123)
+w3 <- w_rnorm(nrow(A), 10, 0, 1, 123)
+w4 <- w_rnorm(nrow(A), 10, 2, 1, 123)
+```
+
+See how the distributions of these different models differ:
+
+```{R, fig.width = 5, fig.height = 3, echo = FALSE}
+w1 <- reshape2::melt(w1)
+w2 <- reshape2::melt(w2)
+w3 <- reshape2::melt(w3)
+w4 <- reshape2::melt(w4)
+w1$method <- "uniform (0, 1)"
+w2$method <- "uniform (0.25, 0.75)"
+w3$method <- "normal (mean = 1, sd = 1)"
+w4$method <- "normal (mean = 0, sd = 1)"
+w <- rbind(w1, w2, w3, w4)
+ggplot(w, aes(x = value, color = method)) + 
+  geom_density() + 
+  theme_classic() + 
+  scale_y_continuous(expand = c(0, 0)) + 
+  scale_x_continuous(expand = c(0, 0)) + 
+  theme(aspect.ratio = 1)
+```
+
+## Evaluating initialization methods
+
+We'll use Mean Squared Error as a simple evaluation metric. We will compare results across several different datasets, as signal complexity can have a profound effect on recoverable NMF solution minima.
+
+```{R, echo = FALSE}
+eval_initializations <- function(A, k, n_reps = 10, ...){
+  models <- list()
+  # cat("spectral initializations\n")
+  m_ <- nmf(A, k, seed = nndsvd(A, k), ...)
+  models[[length(models) + 1]] <- m_@w
+  df <- data.frame(
+    "method" = "nndsvd", 
+    "mse" = evaluate(m_, A, ...),
+    "iter" = m_@misc$iter,
+    "runtime" = m_@misc$runtime)
+  m_ <- nmf(A, k, seed = nndsvd2(A, k), ...)
+  models[[length(models) + 1]] <- m_@w
+  df <- rbind(df, data.frame(
+    "method" = "nndsvd2", 
+    "mse" = evaluate(m_, A, ...),
+    "iter" = m_@misc$iter,
+    "runtime" = m_@misc$runtime))
+  m_ <- nmf(A, k, seed = w_svd(A, k), ...)
+  models[[length(models) + 1]] <- m_@w
+  df <- rbind(df, data.frame(
+    "method" = "svd", 
+    "mse" = evaluate(m_, A, ...),
+    "iter" = m_@misc$iter,
+    "runtime" = m_@misc$runtime))
+  m_ <- nmf(A, k, seed = abs(w_svd(A, k)), ...)
+  models[[length(models) + 1]] <- m_@w
+  df <- rbind(df, data.frame(
+    "method" = "abs(svd)", 
+    "mse" = evaluate(m_, A, ...),
+    "iter" = m_@misc$iter,
+    "runtime" = m_@misc$runtime))
+  # cat("rep: ")
+  for(i in 1:n_reps){
+    # cat(i, " ")
+    m_ <- nmf(A, k, seed = w_runif(nrow(A), k, 0, 1, i), ...)
+    models[[length(models) + 1]] <- m_@w
+    df <- rbind(df, data.frame(
+      "method" = "runif (0, 1)",
+      "mse" = evaluate(m_, A, ...),
+      "iter" = m_@misc$iter,
+      "runtime" = m_@misc$runtime))
+    m_ <- nmf(A, k, seed = w_rnorm(nrow(A), k, 1, 1, i), ...)
+    models[[length(models) + 1]] <- m_@w
+    df <- rbind(df, data.frame(
+      "method" = "rnorm (2, 1)",
+      "mse" = evaluate(m_, A, ...),
+      "iter" = m_@misc$iter,
+      "runtime" = m_@misc$runtime))
+  }
+  names(models) <- df$method
+  df$method <- factor(df$method, levels = unique(df$method))
+  return(list("plot_data" = df, "models" = models))
+}
+```
+
+```{R, echo = FALSE}
+plot_umap <- function(list_of_models, ...){
+  m <- list_of_models[[1]]
+  models <- lapply(list_of_models, function(x) as.vector(x[, bipartiteMatch(1 - cosine(x, m))$pairs]))
+  models <- do.call(rbind, models)
+  umap_coords <- uwot::umap(models, ...)
+  df <- data.frame("umap1" = umap_coords[,1], "umap2" = umap_coords[,2], "method" = names(list_of_models))
+  df$method <- factor(df$method, levels = unique(df$method))
+  ggplot(df, aes(x = umap1, y = umap2, color = method)) + geom_point() + theme_void()
+}
+
+plot_mse <- function(results){
+  results$color <- as.numeric(results$method) %% 2
+  ggplot(results, aes(x = method, y = mse, color = factor(color))) + 
+  geom_jitter(width = 0.1) + 
+  theme_classic() + 
+  labs(y = "MSE", x = "initialization method") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1), legend.position = "none")
+}
+
+plot_runtime <- function(results){
+  results$color <- as.numeric(results$method) %% 2
+  ggplot(results, aes(x = method, y = runtime, color = factor(color))) + 
+  geom_jitter(width = 0.1) + 
+  theme_classic() + 
+  labs(y = "Runtime (sec)", x = "initialization method") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1), legend.position = "none")
+}
+
+plot_iter <- function(results){
+  results$color <- as.numeric(results$method) %% 2
+  ggplot(results, aes(x = method, y = iter, color = factor(color))) + 
+  geom_jitter(width = 0.1) + 
+  theme_classic() + 
+  labs(y = "iterations", x = "initialization method") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1), legend.position = "none")
+}
+```
+
+### `hawaiibirds` dataset
+
+First, we'll look at the hawaii birds dataset. Since this is a small dataset, we will run 50 replicates of each random initialization to 100 iterations.
+
+```{R, message = FALSE, warning = FALSE}
+data(hawaiibirds)
+results <- eval_initializations(
+  hawaiibirds$counts, k = 10, n_reps = 50, tol = 1e-10, maxit = 100)
+```
+
+```{R, fig.width = 4.5, fig.height = 3.5, warning = FALSE, message = FALSE, echo = FALSE}
+plot_grid(plot_mse(results$plot_data),
+          plot_runtime(results$plot_data), nrow = 1)
+```
+
+UMAP plot of all models learned for each initialization:
+
+```{R, fig.width = 3, fig.height = 2, echo = FALSE}
+plot_umap(results$models, metric = "cosine", n_neighbors = 5, min_dist = 0.01)
+```
+
+Clearly, `rnorm(mean = 2, sd = 1)` has discovered a local minima that was not discovered by any other initialization method. Strikingly, it has done so while running faster than other methods.
+
+### `movielens` dataset
+
+For this dataset, we will mask zeros, because 0's indicate movies that have not been rated by the corresponding users.
+
+We will stop factorizations at `tol = 1e-5` and also track the number of iterations needed to get to that point.
+
+```{R, fig.width = 4.5, fig.height = 3.5, message = FALSE, warning = FALSE}
+data(movielens)
+results <- eval_initializations(
+  movielens$ratings, k = 7, n_reps = 10, tol = 1e-5, maxit = 1000, mask = "zeros")
+```
+
+```{R, fig.width = 6.5, fig.height = 3.5, warning = FALSE, message = FALSE, echo = FALSE}
+plot_grid(plot_mse(results$plot_data),
+          plot_runtime(results$plot_data),
+          plot_iter(results$plot_data), nrow = 1)
+```
+
+UMAP plot of the learned models:
+
+```{R, fig.width = 3, fig.height = 2, echo = FALSE, warning = FALSE, message = FALSE}
+plot_umap(results$models, metric = "cosine", n_neighbors = 5, min_dist = 0.01)
+```
+
+Models here are much more similar, but `rnorm` still does surprisingly well, requires surprisingly few iterations, and is quite fast. Almost entirely on-par with this initialization is `nndsvd`.
+
+### `aml` dataset
+
+```{R, fig.width = 4.5, fig.height = 3.5, message = FALSE, warning = FALSE}
+data(aml)
+results <- eval_initializations(aml, k = 10, n_reps = 25, tol = 1e-5)
+```
+
+```{R, fig.width = 6.5, fig.height = 3.5, warning = FALSE, message = FALSE, echo = FALSE}
+plot_grid(
+  plot_mse(results$plot_data),
+  plot_runtime(results$plot_data),
+  plot_iter(results$plot_data),
+  nrow = 1
+)
+```
+
+and a UMAP plot of the learned models:
+
+```{R, fig.width = 3, fig.height = 2, echo = FALSE, warning = FALSE, message = FALSE}
+plot_umap(results$models, metric = "cosine", n_neighbors = 5, min_dist = 0.01)
+```
+
+### Single-cell data
+
+Let's have a look at the pbmc3k dataset made available in the `SeuratData` package. This dataset is an example of complex signal with significant dropout and noise.
+
+```{R, warning = FALSE, message = FALSE}
+library(Seurat)
+library(SeuratData)
+pbmc3k
+```
+
+```{R, message = FALSE, warning = FALSE}
+pbmc <- pbmc3k@assays$RNA@counts
+results_pbmc3k <- eval_initializations(pbmc, k = 7, n_reps = 20, tol = 1e-5)
+```
+
+```{R, fig.width = 6.5, fig.height = 3.5, warning = FALSE, message = FALSE, echo = FALSE}
+plot_grid(
+  plot_mse(results_pbmc3k$plot_data),
+  plot_runtime(results_pbmc3k$plot_data),
+  plot_iter(results_pbmc3k$plot_data),
+  nrow = 1
+)
+```
+
+```{R, fig.width = 3, fig.height = 2, echo = FALSE}
+plot_umap(results_pbmc3k$models, metric = "cosine", n_neighbors = 5, min_dist = 0.01)
+```
+
+### Normalized Single-Cell Data
+
+Log-normalize single cell data and see how these changes in the distribution affect the ideal initialization method:
+
+```{R, message = FALSE, warning = FALSE}
+pbmc_norm <- LogNormalize(pbmc)
+results_pbmc_norm <- eval_initializations(pbmc_norm, k = 7, n_reps = 20, tol = 1e-5)
+```
+
+```{R, fig.width = 6.5, fig.height = 3.5, warning = FALSE, message = FALSE, echo = FALSE}
+plot_grid(
+  plot_mse(results_pbmc_norm$plot_data),
+  plot_runtime(results_pbmc_norm$plot_data),
+  plot_iter(results_pbmc_norm$plot_data),
+  nrow = 1
+)
+```
+
+```{R, fig.width = 3, fig.height = 2, echo = FALSE}
+plot_umap(results_pbmc_norm$models, metric = "cosine", n_neighbors = 5, min_dist = 0.01)
+```
+
+## Takeaways so far
+
+**Runtime:**
+* `rnorm` and `runif`. Consistently faster than SVD-based initializations. There is no convincing difference between `rnorm` and `runif`.
+
+**Loss:**
+* with multiple starts, `rnorm(2, 1)` never does worse than any other method, but performs worse on average than `runif` in single-cell data.
+* `nndsvd` performs as well as `runif` in `aml` and single-cell data, but takes longer. It performs worse than `runif` in `movielens` data (by a lot), and better than `runif` in hawaiibirds (but not as well as `rnorm`)
+
+**Iterations:**
+* `runif` does at least as well as, or better than, all other methods.
+
+Spectral decompositions such as `nndsvd` do not out-perform random initialization-based methods such as `rnorm` or `runif` consistently. In addition, they require that an SVD be run, which increases the total runtime.
+
+## Optimizing runif
+
+It is possible that changing the bounds of the uniform distribution may affect the results.
+
+We will address whether the width of the bounds matters, and the proximity of the lower-bound to zero.  We will look at bounds in the range (0, 1), (0, 2), (0, 10), (1, 2), (1, 10), and (2, 10):
+
+```{R, echo = FALSE, message = FALSE, warning = FALSE}
+eval_runif <- function(A, k, n_reps = 10, ...){
+  df <- data.frame()
+  models <- list()
+  for(i in 1:n_reps){
+    # cat(i, " ")
+    m_ <- nmf(A, k, seed = w_runif(nrow(A), k, 0, 1, i), ...)
+    models[[length(models) + 1]] <- m_@w
+    df <- rbind(df, data.frame(
+      "method" = "runif (0, 1)",
+      "mse" = evaluate(m_, A, ...),
+      "iter" = m_@misc$iter,
+      "runtime" = m_@misc$runtime))
+    m_ <- nmf(A, k, seed = w_runif(nrow(A), k, 0, 2, i), ...)
+    models[[length(models) + 1]] <- m_@w
+    df <- rbind(df, data.frame(
+      "method" = "runif (0, 2)",
+      "mse" = evaluate(m_, A, ...),
+      "iter" = m_@misc$iter,
+      "runtime" = m_@misc$runtime))
+    m_ <- nmf(A, k, seed = w_runif(nrow(A), k, 0, 10, i), ...)
+    models[[length(models) + 1]] <- m_@w
+    df <- rbind(df, data.frame(
+      "method" = "runif (0, 10)",
+      "mse" = evaluate(m_, A, ...),
+      "iter" = m_@misc$iter,
+      "runtime" = m_@misc$runtime))
+    m_ <- nmf(A, k, seed = w_runif(nrow(A), k, 1, 2, i), ...)
+    models[[length(models) + 1]] <- m_@w
+    df <- rbind(df, data.frame(
+      "method" = "runif (1, 2)",
+      "mse" = evaluate(m_, A, ...),
+      "iter" = m_@misc$iter,
+      "runtime" = m_@misc$runtime))
+    m_ <- nmf(A, k, seed = w_runif(nrow(A), k, 1, 10, i), ...)
+    models[[length(models) + 1]] <- m_@w
+    df <- rbind(df, data.frame(
+      "method" = "runif (1, 10)",
+      "mse" = evaluate(m_, A, ...),
+      "iter" = m_@misc$iter,
+      "runtime" = m_@misc$runtime))
+    m_ <- nmf(A, k, seed = w_runif(nrow(A), k, 2, 10, i), ...)
+    models[[length(models) + 1]] <- m_@w
+    df <- rbind(df, data.frame(
+      "method" = "runif (2, 10)",
+      "mse" = evaluate(m_, A, ...),
+      "iter" = m_@misc$iter,
+      "runtime" = m_@misc$runtime))
+  }
+  names(models) <- df$method
+  df$method <- factor(df$method, levels = unique(df$method))
+  return(list("plot_data" = df, "models" = models))
+}
+```
+
+```{R, message = FALSE, warning = FALSE}
+results_hibirds <- eval_runif(hawaiibirds$counts, k = 10, n_reps = 20, tol = 1e-6)
+results_aml <- eval_runif(aml, k = 12, n_reps = 20)
+results_movielens <- eval_runif(movielens$ratings, k = 7, n_reps = 20, mask = "zeros")
+results_pbmc <- eval_runif(pbmc, k = 7, n_reps = 20)
+```
+
+```{R, fig.width = 6, fig.height = 6, warning = FALSE, message = FALSE, echo = FALSE}
+plot_grid(plot_mse(results_hibirds$plot_data) + ggtitle("hawaiibirds"), 
+          plot_mse(results_aml$plot_data) + ggtitle("aml"),
+          plot_mse(results_movielens$plot_data) + ggtitle("movielens"),
+          plot_mse(results_pbmc$plot_data) + ggtitle("pbmc3k"),
+          nrow = 2, ncol = 2)
+```
+
+These results show no consistent recipe for finding the best minima, but that there is considerable dataset-specific variation.
+
+However, it is clear that varying the lower and upper bounds of `runif` across restarts is likely to be useful.
+
+## Optimizing rnorm
+
+Changing the mean and standard deviation of the absolute value of a normal distribution can generate non-normal distributions, in fact, it can generate distributions quite like a gamma distribution. Thus, we will investigate some different combinations of mean and standard deviation:  (0, 0.5), (0, 1), (0, 2), (1, 0.5), (1, 1), and (2, 1):
+
+```{R, echo = FALSE, message = FALSE, warning = FALSE}
+eval_rnorm <- function(A, k, n_reps = 10, ...){
+  df <- data.frame()
+  models <- list()
+  for(i in 1:n_reps){
+    # cat(i, " ")
+    m_ <- nmf(A, k, seed = w_rnorm(nrow(A), k, 0, 0.5, i), ...)
+    models[[length(models) + 1]] <- m_@w
+    df <- rbind(df, data.frame(
+      "method" = "rnorm (0, 0.5)",
+      "mse" = evaluate(m_, A, ...),
+      "iter" = m_@misc$iter,
+      "runtime" = m_@misc$runtime))
+    m_ <- nmf(A, k, seed = w_rnorm(nrow(A), k, 0, 1, i), ...)
+    models[[length(models) + 1]] <- m_@w
+    df <- rbind(df, data.frame(
+      "method" = "rnorm (0, 1)",
+      "mse" = evaluate(m_, A, ...),
+      "iter" = m_@misc$iter,
+      "runtime" = m_@misc$runtime))
+    m_ <- nmf(A, k, seed = w_rnorm(nrow(A), k, 0, 2, i), ...)
+    models[[length(models) + 1]] <- m_@w
+    df <- rbind(df, data.frame(
+      "method" = "rnorm (0, 2)",
+      "mse" = evaluate(m_, A, ...),
+      "iter" = m_@misc$iter,
+      "runtime" = m_@misc$runtime))
+    m_ <- nmf(A, k, seed = w_rnorm(nrow(A), k, 1, 0.5, i), ...)
+    models[[length(models) + 1]] <- m_@w
+    df <- rbind(df, data.frame(
+      "method" = "rnorm (1, 0.5)",
+      "mse" = evaluate(m_, A, ...),
+      "iter" = m_@misc$iter,
+      "runtime" = m_@misc$runtime))
+    m_ <- nmf(A, k, seed = w_rnorm(nrow(A), k, 1, 1, i), ...)
+    models[[length(models) + 1]] <- m_@w
+    df <- rbind(df, data.frame(
+      "method" = "rnorm (1, 1)",
+      "mse" = evaluate(m_, A, ...),
+      "iter" = m_@misc$iter,
+      "runtime" = m_@misc$runtime))
+    m_ <- nmf(A, k, seed = w_rnorm(nrow(A), k, 2, 1, i), ...)
+    models[[length(models) + 1]] <- m_@w
+    df <- rbind(df, data.frame(
+      "method" = "rnorm (2, 1)",
+      "mse" = evaluate(m_, A, ...),
+      "iter" = m_@misc$iter,
+      "runtime" = m_@misc$runtime))
+  }
+  names(models) <- df$method
+  df$method <- factor(df$method, levels = unique(df$method))
+  return(list("plot_data" = df, "models" = models))
+}
+```
+
+```{R, message = FALSE, warning = FALSE}
+results_hibirds <- eval_rnorm(hawaiibirds$counts, k = 10, n_reps = 20, tol = 1e-6)
+results_aml <- eval_rnorm(aml, k = 12, n_reps = 20)
+results_movielens <- eval_rnorm(movielens$ratings, k = 7, n_reps = 20, mask = "zeros")
+results_pbmc <- eval_rnorm(pbmc, k = 7, n_reps = 20)
+```
+
+```{R, fig.width = 6, fig.height = 6, warning = FALSE, message = FALSE, echo = FALSE}
+plot_grid(plot_mse(results_hibirds$plot_data) + ggtitle("hawaiibirds"), 
+          plot_mse(results_aml$plot_data) + ggtitle("aml"),
+          plot_mse(results_movielens$plot_data) + ggtitle("movielens"),
+          plot_mse(results_pbmc$plot_data) + ggtitle("pbmc3k"),
+          nrow = 2, ncol = 2)
+```
+
+Here it's more difficult to pick a winner, they really perform similarly. For the `pbmc3k` dataset, however, `rnorm(2,1)` is probably the best choice. This distribution is largely normal, as opposed to gamma (i.e. `rnorm(0, 0.5)`, which could be seen as the "loser") or a lopsided bell-curve shaped (i.e. `rnorm(1, 1)).
