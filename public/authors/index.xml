@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Authors | Zach DeBruine</title>
+    <link>https://zachdebruine.com/authors/</link>
+      <atom:link href="https://zachdebruine.com/authors/index.xml" rel="self" type="application/rss+xml" />
+    <description>Authors</description>
+    <generator>Wowchemy (https://wowchemy.com)</generator><language>en-us</language><copyright>© 2021 Zach DeBruine</copyright>
+    <image>
+      <url>https://zachdebruine.com/media/icon_hu3a1a9d362c9f3f4d7273828c49d8e14c_75812_512x512_fill_lanczos_center_3.png</url>
+      <title>Authors</title>
+      <link>https://zachdebruine.com/authors/</link>
+    </image>
+    
+  </channel>
+</rss>

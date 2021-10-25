@@ -1,0 +1,1165 @@
+<!DOCTYPE html><html lang="en-us" >
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  
+  
+  
+    <meta name="generator" content="Wowchemy 5.3.0 for Hugo" />
+  
+
+  
+
+  
+  
+  
+  
+  
+    
+    
+    
+  
+  
+
+  <meta name="author" content="Zach DeBruine" />
+
+  
+  
+  
+    
+  
+  <meta name="description" content="L1- and L2-regularized non-negative matrix factorizations have special properties. Here I show how L1 is a sparsifying regularization that promotes a k-means clustering-like model, while L2 is a densifying regularization that promotes convergence of all factors towards the first singular vector." />
+
+  
+  <link rel="alternate" hreflang="en-us" href="https://zachdebruine.com/post/l2-regularized-nmf/" />
+
+  
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+  
+  
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  
+
+  
+  
+  
+    <meta name="theme-color" content="#1565c0" />
+  
+
+  
+  
+
+  
+
+  <link rel="stylesheet" href="/css/vendor-bundle.min.f1ecf783c14edc00c9320c205831ad8e.css" media="print" onload="this.media='all'">
+
+  
+  
+  
+    
+    
+      <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/academicons/1.9.0/css/academicons.min.css" integrity="sha512-W4yqoT1+8NLkinBLBZko+dFB2ZbHsYLDdr50VElllRcNt2Q4/GSs6u71UHKxB7S6JEMCp5Ve4xjh3eGQl/HRvg==" crossorigin="anonymous" media="print" onload="this.media='all'">
+    
+
+    
+    
+    
+    
+      
+      
+    
+    
+    
+
+    
+    
+    
+      
+    
+    
+      
+      
+        
+          <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.2.0/styles/github.min.css" crossorigin="anonymous" title="hl-light" media="print" onload="this.media='all'">
+          <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.2.0/styles/dracula.min.css" crossorigin="anonymous" title="hl-dark" media="print" onload="this.media='all'" disabled>
+        
+      
+    
+
+    
+    
+    
+      <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/leaflet.min.css" integrity="sha512-1xoFisiGdy9nvho8EgXuXvnpR5GAMSjFwp40gSRE3NwdUdIMIKuPa7bqoUhLD0O/5tPNhteAsE5XyyMi5reQVA==" crossorigin="anonymous" media="print" onload="this.media='all'">
+    
+
+    
+
+    
+    
+      
+      
+
+      
+      
+
+      
+    
+      
+      
+
+      
+      
+
+      
+    
+      
+      
+
+      
+      
+
+      
+    
+      
+      
+
+      
+      
+
+      
+    
+      
+      
+
+      
+      
+
+      
+    
+      
+      
+
+      
+      
+
+      
+    
+      
+      
+
+      
+      
+
+      
+    
+      
+      
+
+      
+      
+
+      
+    
+      
+      
+
+      
+      
+
+      
+    
+      
+      
+
+      
+      
+
+      
+    
+      
+      
+
+      
+      
+
+      
+    
+      
+      
+
+      
+      
+
+      
+    
+      
+      
+
+      
+      
+        
+      
+
+      
+    
+      
+      
+
+      
+      
+
+      
+    
+      
+      
+
+      
+      
+
+      
+    
+  
+
+  
+  
+  
+    
+      
+      <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&family=Roboto+Mono&family=Roboto:wght@400;700&display=swap">
+      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&family=Roboto+Mono&family=Roboto:wght@400;700&display=swap" media="print" onload="this.media='all'">
+    
+  
+
+  
+  
+  
+  
+  
+  <link rel="stylesheet" href="/css/wowchemy.fb09bd065933df494dfc11df8e3c78fa.css" />
+
+  
+
+
+
+  
+
+  
+
+  
+
+
+
+
+  
+  
+  
+
+  
+
+  
+    <link rel="manifest" href="/manifest.webmanifest" />
+  
+
+  <link rel="icon" type="image/png" href="/media/icon_hu3a1a9d362c9f3f4d7273828c49d8e14c_75812_32x32_fill_lanczos_center_3.png" />
+  <link rel="apple-touch-icon" type="image/png" href="/media/icon_hu3a1a9d362c9f3f4d7273828c49d8e14c_75812_180x180_fill_lanczos_center_3.png" />
+
+  <link rel="canonical" href="https://zachdebruine.com/post/l2-regularized-nmf/" />
+
+  
+  
+  
+  
+  
+  
+  
+  
+    
+  
+  
+  <meta property="twitter:card" content="summary_large_image" />
+  
+  <meta property="og:site_name" content="Zach DeBruine" />
+  <meta property="og:url" content="https://zachdebruine.com/post/l2-regularized-nmf/" />
+  <meta property="og:title" content="Statistical properties of L1- and L2-regularized NMF | Zach DeBruine" />
+  <meta property="og:description" content="L1- and L2-regularized non-negative matrix factorizations have special properties. Here I show how L1 is a sparsifying regularization that promotes a k-means clustering-like model, while L2 is a densifying regularization that promotes convergence of all factors towards the first singular vector." /><meta property="og:image" content="https://zachdebruine.com/post/l2-regularized-nmf/featured.png" />
+    <meta property="twitter:image" content="https://zachdebruine.com/post/l2-regularized-nmf/featured.png" /><meta property="og:locale" content="en-us" />
+  
+    
+      <meta
+        property="article:published_time"
+        content="2021-10-18T00:00:00&#43;00:00"
+      />
+    
+    <meta property="article:modified_time" content="2021-10-18T00:00:00&#43;00:00">
+  
+
+  
+
+
+    
+
+
+
+
+
+
+  
+
+
+
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "mainEntityOfPage": {
+    "@type": "WebPage",
+    "@id": "https://zachdebruine.com/post/l2-regularized-nmf/"
+  },
+  "headline": "Statistical properties of L1- and L2-regularized NMF",
+  
+  "image": [
+    "https://zachdebruine.com/post/l2-regularized-nmf/featured.png"
+  ],
+  
+  "datePublished": "2021-10-18T00:00:00Z",
+  "dateModified": "2021-10-18T00:00:00Z",
+  
+  "author": {
+    "@type": "Person",
+    "name": "Zach DeBruine"
+  },
+  
+  "publisher": {
+    "@type": "Organization",
+    "name": "Zach DeBruine",
+    "logo": {
+      "@type": "ImageObject",
+      "url": "https://zachdebruine.com/media/icon_hu3a1a9d362c9f3f4d7273828c49d8e14c_75812_192x192_fill_lanczos_center_3.png"
+    }
+  },
+  "description": "L1- and L2-regularized non-negative matrix factorizations have special properties. Here I show how L1 is a sparsifying regularization that promotes a k-means clustering-like model, while L2 is a densifying regularization that promotes convergence of all factors towards the first singular vector."
+}
+</script>
+
+  
+
+  
+
+  
+
+  
+
+
+
+
+
+  <title>Statistical properties of L1- and L2-regularized NMF | Zach DeBruine</title>
+</head>
+
+
+<body id="top" data-spy="scroll" data-offset="70" data-target="#TableOfContents" class="page-wrapper   " data-wc-page-id="343418ecd882c05df57e032509cf7ba1" >
+
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  <script src="/js/wowchemy-init.min.7f3e7639f4c7f2a2cf83b68ea7de7f08.js"></script>
+
+  
+
+
+<aside class="search-modal" id="search">
+  <div class="container">
+    <section class="search-header">
+
+      <div class="row no-gutters justify-content-between mb-3">
+        <div class="col-6">
+          <h1>Search</h1>
+        </div>
+        <div class="col-6 col-search-close">
+          <a class="js-search" href="#" aria-label="Close"><i class="fas fa-times-circle text-muted" aria-hidden="true"></i></a>
+        </div>
+      </div>
+
+      <div id="search-box">
+        
+        <input name="q" id="search-query" placeholder="Search..." autocapitalize="off"
+        autocomplete="off" autocorrect="off" spellcheck="false" type="search" class="form-control"
+        aria-label="Search...">
+        
+      </div>
+
+      
+      
+
+      
+
+    </section>
+    <section class="section-search-results">
+
+      <div id="search-hits">
+        
+      </div>
+
+    </section>
+  </div>
+</aside>
+
+
+
+  <div class="page-header">
+    
+
+
+
+
+
+
+
+
+
+
+
+
+<nav class="navbar navbar-expand-lg navbar-light compensate-for-scrollbar" id="navbar-main">
+  <div class="container-xl">
+
+    
+    <div class="d-none d-lg-inline-flex">
+      <a class="navbar-brand" href="/">Zach DeBruine</a>
+    </div>
+    
+
+    
+    <button type="button" class="navbar-toggler" data-toggle="collapse"
+            data-target="#navbar-content" aria-controls="navbar-content" aria-expanded="false" aria-label="Toggle navigation">
+    <span><i class="fas fa-bars"></i></span>
+    </button>
+    
+
+    
+    <div class="navbar-brand-mobile-wrapper d-inline-flex d-lg-none">
+      <a class="navbar-brand" href="/">Zach DeBruine</a>
+    </div>
+    
+
+    
+    
+    <div class="navbar-collapse main-menu-item collapse justify-content-start" id="navbar-content">
+
+      
+      <ul class="navbar-nav d-md-inline-flex">
+        
+
+        
+
+        
+        
+        
+          
+        
+
+        
+
+        
+        
+        
+        
+
+        
+          
+            
+            
+          
+          
+            
+            
+            
+              
+            
+            
+          
+        
+
+        <li class="nav-item">
+          <a class="nav-link " href="/#posts"><span>Posts</span></a>
+        </li>
+
+        
+        
+
+        
+
+        
+        
+        
+          
+        
+
+        
+
+        
+        
+        
+        
+
+        
+          
+            
+            
+          
+          
+            
+            
+            
+              
+            
+            
+          
+        
+
+        <li class="nav-item">
+          <a class="nav-link " href="/#about"><span>About</span></a>
+        </li>
+
+        
+        
+
+      
+
+        
+      </ul>
+    </div>
+
+    <ul class="nav-icons navbar-nav flex-row ml-auto d-flex pl-md-2">
+
+      
+      
+        
+          
+          <li class="nav-item d-none d-lg-inline-flex">
+            <a class="nav-link" href="/"  aria-label="">
+              <i class="fas fa-" aria-hidden="true"></i>
+            </a>
+          </li>
+        
+      
+
+      
+      
+      <li class="nav-item">
+        <a class="nav-link js-search" href="#" aria-label="Search"><i class="fas fa-search" aria-hidden="true"></i></a>
+      </li>
+      
+
+      
+      
+
+      
+      
+
+    </ul>
+
+  </div>
+</nav>
+
+
+  </div>
+
+  <div class="page-body">
+    <article class="article">
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+  
+  
+<div class="article-container pt-3">
+  <h1>Statistical properties of L1- and L2-regularized NMF</h1>
+
+  
+  <p class="page-subtitle">An intuitive take on what exactly L1- and L2-regularized NMF actually does</p>
+  
+
+  
+    
+
+
+<div class="article-metadata">
+
+  
+  
+
+  
+  <span class="article-date">
+    
+    
+      
+    
+    Oct 18, 2021
+  </span>
+  
+
+  
+
+  
+
+  
+  
+  
+  
+  
+  
+
+  
+  
+  <span class="middot-divider"></span>
+  <span class="article-categories">
+    <i class="fas fa-folder mr-1"></i><a href="/category/nmf/">NMF</a>, <a href="/category/methods/">methods</a></span>
+  
+
+</div>
+
+    
+
+
+
+
+
+  
+</div>
+
+
+
+  <div class="article-container">
+
+    <div class="article-style">
+      
+
+
+<div id="key-takeaways" class="section level2">
+<h2>Key Takeaways</h2>
+<p>For non-negative matrix factorization:</p>
+<ul>
+<li>L1 and L2 regularization require diagonalization (factorization of the form <span class="math inline">\(A = wdh\)</span>)</li>
+<li>L1 is a sparsifying, L2 is densifying</li>
+<li>L1 increases angle between factors, L2 decreases angle between factors</li>
+<li>L1 penalties cause factors to converge collectively towards a k-means clustering model, L2 penalties cause each factor to converge individually towards the first singular vector</li>
+</ul>
+</div>
+<div id="regularizing-nmf" class="section level2">
+<h2>Regularizing NMF</h2>
+<p>Regularizations are intended to improve the interpretability or identifiability of linear models. Consider the least squares problem <span class="math inline">\(ax = b\)</span>, for which common regularizations include:</p>
+<ul>
+<li><strong>L1/LASSO</strong> regularization: absolute shrinkage, penalty subtracted from <span class="math inline">\(b\)</span></li>
+<li><strong>L2/Ridge</strong> regularization: convex shrinkage, penalty added to diagonal of <span class="math inline">\(a\)</span></li>
+</ul>
+<p>In a typical non-negative least squares (NNLS) fit, these regularizations behave usefully. For example, an L1 penalty equal to the maximum value in <span class="math inline">\(b\)</span> will ensure complete sparsity of the solution.</p>
+<p>Now consider NMF by alternating least squares. NMF differs from one-off least squares problems in several ways:</p>
+<ul>
+<li>It is iterative</li>
+<li>The initial distribution of the models are unknown (i.e. projection of random factors)</li>
+<li>The distribution of a model at a given iteration is dependent on that of the models at all previous iterations</li>
+</ul>
+<p>Thus, NMF regularizations have a chain effect: a change in one iteration will lead to a change in information and distribution in the next, and so forth. Thus, if the distribution of the model is not controlled after each update, penalties will cause the model to spiral out of control.</p>
+</div>
+<div id="controlling-nmf-model-distributions-during-updates" class="section level2">
+<h2>Controlling NMF model distributions during updates</h2>
+<p>NMF minimizes <span class="math inline">\(A = wh\)</span>. The least squares update of <span class="math inline">\(h\)</span>, column <span class="math inline">\(j\)</span> given <span class="math inline">\(A\)</span> and <span class="math inline">\(w\)</span> is:</p>
+<p><span class="math display">\[w^Twh_j = w^TA_j\]</span></p>
+<p>Correspondingly, the least squares update of <span class="math inline">\(w\)</span>, row <span class="math inline">\(j\)</span>, given <span class="math inline">\(A\)</span> and <span class="math inline">\(h\)</span> is:</p>
+<p><span class="math display">\[hh^Tw_j = hA^T_j\]</span>
+These equations are in the form <span class="math inline">\(ax = b\)</span>. For instance, in the update of <span class="math inline">\(h\)</span>, <span class="math inline">\(a = w^Tw\)</span> and <span class="math inline">\(b = w^TA_j\)</span>.</p>
+<p>For a regularization penalty strictly in the range (0, 1], we want to guarantee that the penalty will be consistent across random NMF restarts, different datasets, and across alternating least squares updates. To guarantee consistent application of the penalty, we need to control the distribution of <span class="math inline">\(a\)</span> and <span class="math inline">\(b\)</span>.</p>
+<p>The distribution of a model can be controlled by diagonalizing the NMF model, such that <span class="math inline">\(A = wdh\)</span>, where columns in <span class="math inline">\(w\)</span> and rows in <span class="math inline">\(h\)</span> are scaled to sum to 1 by a scaling diagonal, <span class="math inline">\(d\)</span>. Factors need not scale to 1, it could be any constant value, but 1 provides nice interpretability.</p>
+</div>
+<div id="diagonalized-nmf-enables-convex-regularization" class="section level2">
+<h2>Diagonalized NMF enables convex regularization</h2>
+<p>Let’s load the <code>hawaiibirds</code> dataset and factorize the data at several L1 and L2 penalties, with and without model diagonalization, also calculating various statistics such as sparsity, similarity to k-means clustering, and similarity to the first singular vector.</p>
+<pre class="r"><code># devtools::install_github(&quot;zdebruine/RcppML&quot;)
+library(RcppML)
+data(hawaiibirds)
+A &lt;- hawaiibirds$counts</code></pre>
+<pre class="r"><code>alphas &lt;- c(c(1, 3, 5, 9) %o% 10^(-3:-1)) # c(seq(0, 0.1, 0.005), seq(0.11, 0.5, 0.01)) # seq(0, 0.98, 0.02)
+seeds &lt;- c(123, 456, 789)
+kmeans_centers &lt;- t(kmeans(t(as.matrix(A)), 10)$centers)
+svd1 &lt;- nmf(A, 1)@w
+df &lt;- data.frame()
+for(alpha in alphas){
+  for(seed in seeds){
+    for(diag in c(FALSE, TRUE)){
+      m &lt;- nmf(A, 10, seed = seed, diag = diag)
+        for(penalty in c(&quot;L1&quot;, &quot;L2&quot;)){
+        m_ &lt;- nmf(A, 10, seed = seed, diag = diag,
+                   L1 = ifelse(penalty == &quot;L1&quot;, alpha, 0), 
+                   L2 = ifelse(penalty == &quot;L2&quot;, alpha, 0),
+                  )
+        df &lt;- rbind(df, data.frame(
+          &quot;alpha&quot; = alpha,
+          &quot;seed&quot; = seed,
+          &quot;diag&quot; = diag,
+          &quot;penalty&quot; = penalty,
+          &quot;sparsity&quot; = sum(m_@w == 0) / prod(dim(m_@w)),
+          &quot;robustness&quot; = 1 - bipartiteMatch(1 - cosine(m_@w, m@w))$cost/10,
+          &quot;mse&quot; = evaluate(m_, A),
+          &quot;mean_angle&quot; = mean(cosine(m_@w)),
+          &quot;kmeans&quot; = bipartiteMatch(1 - cosine(kmeans_centers, m_@w))$cost/10,
+          &quot;svd1&quot; = sum(cosine(m_@w, svd1))/10,
+          &quot;color&quot; = ifelse(penalty == &quot;L1&quot;, alpha^0.25, -alpha^0.25)
+        ))      
+      }
+    }
+  }
+}
+df$penalty &lt;- factor(df$penalty)
+df$seed &lt;- factor(df$seed)</code></pre>
+<p><img src="https://zachdebruine.com/post/l2-regularized-nmf/index.en_files/figure-html/unnamed-chunk-2-1.png" width="768" style="display: block; margin: auto auto auto 0;" /></p>
+<p>Takeaways:</p>
+<ul>
+<li>Diagonal scaling guarantees consistent regularization between independent replicates (compare <strong>a</strong>, <strong>c</strong> with <strong>b</strong>, <strong>d</strong>)</li>
+<li>L1 regularization increases sparsity of factor models (<strong>b</strong>) while L2 regularization promotes density of the model (<strong>d</strong>)</li>
+<li>L1 = 1 guarantees complete sparsity (<strong>b</strong>) while L2 = 1 guarantees complete density (<strong>d</strong>)</li>
+</ul>
+<p>We might not have expected that L2 is a densifying factorization. Why is this? L2 convexly shrinks values towards zero, and as such decreases the condition number of <span class="math inline">\(a\)</span>. This means signals will be encouraged to “squash” together, and factors in the resulting model will begin to describe similar signal. As this occurs, the model naturally becomes denser until a point is reached that the objective is minimized (at convergence).</p>
+</div>
+<div id="properties-of-l1--and-l2-regularized-nmf" class="section level2">
+<h2>Properties of L1- and L2-regularized NMF</h2>
+<p>Let’s consider how L1 and L2 regularizations affect the robustness of information content of factor models relative to the unregularized equivalent, and how they affect the mean squared error loss of the models.</p>
+<p>As a measure of the robustness of information content, we use the mean cost of bipartite matching between L1-regularized and unregularized <span class="math inline">\(w\)</span> models on a cosine similarity matrix.</p>
+<p><img src="https://zachdebruine.com/post/l2-regularized-nmf/index.en_files/figure-html/unnamed-chunk-3-1.png" width="672" style="display: block; margin: auto auto auto 0;" /></p>
+<p>Notice how the L2 penalties tend to be much harsher than the L1 penalties. However, both penalties cause movement of the model away from the unregularized state.</p>
+<p>Within the models themselves, we can examine how similar factors are to one another by measuring the mean cosine angle:</p>
+<pre class="r"><code>ggplot(subset(df, diag == TRUE &amp; seed == 123), aes(x = alpha, y = mean_angle, color = penalty)) +
+  geom_point() + labs(x = &quot;alpha&quot;, y = &quot;mean cosine angle\nbetween factors&quot;) +
+  theme_classic() + theme(aspect.ratio = 1) + scale_x_continuous(trans = &quot;sqrt&quot;) +
+  stat_smooth(se = F)</code></pre>
+<p><img src="https://zachdebruine.com/post/l2-regularized-nmf/index.en_files/figure-html/unnamed-chunk-4-1.png" width="384" style="display: block; margin: auto auto auto 0;" /></p>
+<p>We can see that L1 penalty increases the distance between factors, while L2 penalty increases the similarity between factors.</p>
+<p>Now let’s take a look at how L1 and L2 penalties affect the sparsity of factors, and also calculate the similarity of these models to a k-means clustering or the first singular vector (given by a rank-1 NMF):</p>
+<p><img src="https://zachdebruine.com/post/l2-regularized-nmf/index.en_files/figure-html/unnamed-chunk-5-1.png" width="672" style="display: block; margin: auto auto auto 0;" /></p>
+<p>L1 is sparsifying while L2 is densifying.</p>
+<p><img src="https://zachdebruine.com/post/l2-regularized-nmf/index.en_files/figure-html/unnamed-chunk-6-1.png" width="672" style="display: block; margin: auto auto auto 0;" /></p>
+<p>Here, L1 promotes a k-means clustering model while L2 promotes convergence towards the first singular vector.</p>
+</div>
+<div id="interpreting-l1--and-l2-regularized-factor-models" class="section level2">
+<h2>Interpreting L1- and L2-regularized factor models</h2>
+<p>We’ll select regularization parameters for further analysis based on a cosine angle of about 0.25 away from the original model:</p>
+<pre class="r"><code>model    &lt;- nmf(A, 10, tol = 1e-6, seed = 123)
+model_L1 &lt;- nmf(A, 10, tol = 1e-6, seed = 123, L1 = 0.2)
+model_L2 &lt;- nmf(A, 10, tol = 1e-6, seed = 123, L2 = 0.02)</code></pre>
+<p>Take a look at the clustering of factors in the <span class="math inline">\(w\)</span> models on UMAP coordinates:</p>
+<p><img src="https://zachdebruine.com/post/l2-regularized-nmf/index.en_files/figure-html/unnamed-chunk-8-1.png" width="288" style="display: block; margin: auto auto auto 0;" /></p>
+<p>Similar information is clearly being captured by each of the models, but let’s see in what way.</p>
+<p>We’ll align factors in the regularized models to the unregularized models, and then compare specific factors.</p>
+<pre class="r"><code>library(ggrepel)
+biplot &lt;- function(model1, model2, factor){
+  df &lt;- data.frame(&quot;model1&quot; = model1$w[, factor], &quot;model2&quot; = model2$w[, factor], &quot;label&quot; = rownames(model1$w))
+  ggplot(df, aes(x = model1, y = model2, label = label)) + geom_point() + theme_classic() + geom_text_repel(size = 2.5)
+}
+
+model_L1 &lt;- align(model_L1, model)
+model_L2 &lt;- align(model_L2, model)</code></pre>
+<p><img src="https://zachdebruine.com/post/l2-regularized-nmf/index.en_files/figure-html/unnamed-chunk-10-1.png" width="576" style="display: block; margin: auto auto auto 0;" /></p>
+<p>These are very harsh penalties, so notice how L1 can over-sparsify things, while L2 can generate factors that are so dense the information is hardly specific or informative.</p>
+<p>A happy medium for sparsifying (or densifying) regularization certainly exists, and this is an objective hyperparameter that must be determined against the objectives of the analysis. Unfortunately, there is nothing against which to optimize – this appears to be a matter of statistical taste.</p>
+</div>
+<div id="future-directions" class="section level2">
+<h2>Future directions</h2>
+<ul>
+<li>Effect of L1 and L2 regularizations on factorization rank</li>
+<li>Intuition behind one-sided L1 and L2 regularization</li>
+<li>Intuition behind combined L1/L2 or one-sided L1 vs. one-sided L2</li>
+</ul>
+</div>
+
+    </div>
+
+    
+
+
+
+
+
+
+<div class="article-tags">
+  
+  <a class="badge badge-light" href="/tag/nmf/">NMF</a>
+  
+  <a class="badge badge-light" href="/tag/regularization/">regularization</a>
+  
+  <a class="badge badge-light" href="/tag/l2/">L2</a>
+  
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+
+
+
+  
+  
+  
+    
+  
+  
+  
+  <div class="media author-card content-widget-hr">
+    
+      
+      <a href="https://zachdebruine.com/"><img class="avatar mr-3 avatar-circle" src="/author/zach-debruine/avatar_hufe5cf19ab3862ec1ff7e31e2bfb05ae9_344625_270x270_fill_q75_lanczos_center.jpg" alt="Zach DeBruine"></a>
+    
+
+    <div class="media-body">
+      <h5 class="card-title"><a href="https://zachdebruine.com/">Zach DeBruine</a></h5>
+      <h6 class="card-subtitle">Postdoctoral Fellow in Bioinformatics</h6>
+      <p class="card-text">Postdoctoral fellow in bioinformatics interested in single-cell experiments and dimensional reduction. I love simple, fast, and common sense data analysis.</p>
+      <ul class="network-icon" aria-hidden="true">
+  
+    
+    
+    
+      
+    
+    
+    
+    
+    
+    <li>
+      <a href="mailto::zacharydebruine@gmail.com" >
+        <i class="fas fa-envelope"></i>
+      </a>
+    </li>
+  
+    
+    
+    
+      
+    
+    
+    
+    
+    
+      
+    
+    <li>
+      <a href="/" >
+        <i class="fas fa-"></i>
+      </a>
+    </li>
+  
+    
+    
+    
+    
+    
+    
+    
+      
+    
+    <li>
+      <a href="https://scholar.google.com/citations?user=l9qurb4AAAAJ" target="_blank" rel="noopener">
+        <i class="ai ai-google-scholar"></i>
+      </a>
+    </li>
+  
+    
+    
+    
+      
+    
+    
+    
+    
+    
+      
+    
+    <li>
+      <a href="https://github.com/zdebruine" target="_blank" rel="noopener">
+        <i class="fab fa-github"></i>
+      </a>
+    </li>
+  
+    
+    
+    
+      
+    
+    
+    
+    
+    
+      
+    
+    <li>
+      <a href="https://www.linkedin.com/in/zacharydebruine/" target="_blank" rel="noopener">
+        <i class="fab fa-linkedin"></i>
+      </a>
+    </li>
+  
+    
+    
+    
+    
+    
+    
+    
+      
+    
+    <li>
+      <a href="https://orcid.org/0000-0003-2234-4827/" target="_blank" rel="noopener">
+        <i class="ai ai-orcid"></i>
+      </a>
+    </li>
+  
+    
+    
+    
+      
+    
+    
+    
+    
+    
+      
+    
+    <li>
+      <a href="https://stackoverflow.com/users/1436247/zdebruine/" target="_blank" rel="noopener">
+        <i class="fab fa-stack-overflow"></i>
+      </a>
+    </li>
+  
+</ul>
+
+    </div>
+  </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+</article>
+  </div>
+
+  <div class="page-footer">
+    
+    
+    <div class="container">
+      
+
+    <script src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS_HTML"></script>
+    
+    <script type="text/x-mathjax-config">
+    MathJax.Hub.Config({
+        tex2jax: {
+            inlineMath: [ ['$','$'], ["\\(","\\)"] ],
+            displayMath: [ ['$$','$$'], ["\\[","\\]"] ],
+            processEscapes: true,
+            processEnvironments: true
+        },
+        // Center justify equations in code and markdown cells. Elsewhere
+        // we use CSS to left justify single line equations in code cells.
+        displayAlign: 'center',
+        "HTML-CSS": {
+            styles: {'.MathJax_Display': {"margin": 0}},
+            linebreaks: { automatic: true }
+        }
+    });
+    </script>
+    
+    </div>
+    
+  </div>
+
+  
+<div id="modal" class="modal fade" role="dialog">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Cite</h5>
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body">
+        <pre><code class="tex hljs"></code></pre>
+      </div>
+      <div class="modal-footer">
+        <a class="btn btn-outline-primary my-1 js-copy-cite" href="#" target="_blank">
+          <i class="fas fa-copy"></i> Copy
+        </a>
+        <a class="btn btn-outline-primary my-1 js-download-cite" href="#" target="_blank">
+          <i class="fas fa-download"></i> Download
+        </a>
+        <div id="modal-error"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+      
+
+    
+    <script src="/js/vendor-bundle.min.b73dfaac3b6499dc997741748a7c3fe2.js"></script>
+
+    
+    
+    
+      
+      
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.imagesloaded/4.1.4/imagesloaded.pkgd.min.js" integrity="sha256-lqvxZrPLtfffUl2G/e7szqSvPBILGbwmsGE1MKlOi0Q=" crossorigin="anonymous"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.isotope/3.0.6/isotope.pkgd.min.js" integrity="sha256-CBrpuqrMhXwcLLUd5tvQ4euBHCdh7wGlDfNz8vbu/iI=" crossorigin="anonymous"></script>
+      
+
+      
+      
+
+      
+
+      
+        
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.2.0/highlight.min.js" integrity="sha512-TDKKr+IvoqZnPzc3l35hdjpHD0m+b2EC2SrLEgKDRWpxf2rFCxemkgvJ5kfU48ip+Y+m2XVKyOCD85ybtlZDmw==" crossorigin="anonymous"></script>
+        
+        
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.2.0/languages/r.min.js" crossorigin="anonymous"></script>
+        
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.2.0/languages/python.min.js" crossorigin="anonymous"></script>
+        
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.2.0/languages/latex.min.js" crossorigin="anonymous"></script>
+        
+      
+
+    
+
+    
+    
+    
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/leaflet.min.js" integrity="sha512-SeiQaaDh73yrb56sTW/RgVdi/mMqNeM2oBwubFHagc5BkixSpP1fvqF47mKzPGWYSSy4RwbBunrJBQ4Co8fRWA==" crossorigin="anonymous"></script>
+    
+
+    
+    
+
+    
+    
+    
+      
+      <script id="search-hit-fuse-template" type="text/x-template">
+        <div class="search-hit" id="summary-{{key}}">
+          <div class="search-hit-content">
+            <div class="search-hit-name">
+              <a href="{{relpermalink}}">{{title}}</a>
+              <div class="article-metadata search-hit-type">{{type}}</div>
+              <p class="search-hit-description">{{snippet}}</p>
+            </div>
+          </div>
+        </div>
+      </script>
+      
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/fuse.js/3.2.1/fuse.min.js" integrity="sha256-VzgmKYmhsGNNN4Ph1kMW+BjoYJM2jV5i4IlFoeZA9XI=" crossorigin="anonymous"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/mark.js/8.11.1/jquery.mark.min.js" integrity="sha256-4HLtjeVgH0eIB3aZ9mLYF6E8oU5chNdjU6p6rrXpl9U=" crossorigin="anonymous"></script>
+      
+    
+
+    
+    
+
+    
+    
+    
+    
+
+    
+    
+      
+      
+      
+      
+      
+      
+      
+    
+
+    
+    
+    
+    
+    
+    
+    
+    
+      
+      
+    
+    
+    <script src="/en/js/wowchemy.min.d68ecd57c0ec1f1f61d65fd568f1c3a0.js"></script>
+
+    
+  <script async defer src="https://buttons.github.io/buttons.js"></script>
+
+
+
+
+</body>
+</html>

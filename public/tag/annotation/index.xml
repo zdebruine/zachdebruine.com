@@ -1,0 +1,244 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>annotation | Zach DeBruine</title>
+    <link>https://zachdebruine.com/tag/annotation/</link>
+      <atom:link href="https://zachdebruine.com/tag/annotation/index.xml" rel="self" type="application/rss+xml" />
+    <description>annotation</description>
+    <generator>Wowchemy (https://wowchemy.com)</generator><language>en-us</language><copyright>© 2021 Zach DeBruine</copyright><lastBuildDate>Tue, 12 Oct 2021 00:00:00 +0000</lastBuildDate>
+    <image>
+      <url>https://zachdebruine.com/media/icon_hu3a1a9d362c9f3f4d7273828c49d8e14c_75812_512x512_fill_lanczos_center_3.png</url>
+      <title>annotation</title>
+      <link>https://zachdebruine.com/tag/annotation/</link>
+    </image>
+    
+    <item>
+      <title>Annotating NMF factors with sample metadata</title>
+      <link>https://zachdebruine.com/post/annotating-nmf-factors-with-sample-metadata/</link>
+      <pubDate>Tue, 12 Oct 2021 00:00:00 +0000</pubDate>
+      <guid>https://zachdebruine.com/post/annotating-nmf-factors-with-sample-metadata/</guid>
+      <description>
+
+
+&lt;div id=&#34;annotating-nmf-factors&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Annotating NMF factors&lt;/h2&gt;
+&lt;p&gt;NMF learns an interpretable low-rank representation of data. However, how do we make sense of the factors in this low-rank latent model? A great way to begin annotating a latent space is to simply map it back to known sample and feature traits.&lt;/p&gt;
+&lt;p&gt;This vignette demonstrates these concepts using an NMF model of bird species communities throughout the Hawaiian islands.&lt;/p&gt;
+&lt;/div&gt;
+&lt;div id=&#34;install-rcppml&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Install RcppML&lt;/h2&gt;
+&lt;p&gt;Install the RcppML R package from CRAN or the development version from GitHub. Also install the accompanying Machine Learning datasets (MLdata) package:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;install.packages(&amp;#39;RcppML&amp;#39;)                     # install CRAN version
+# devtools::install_github(&amp;quot;zdebruine/RcppML&amp;quot;) # compile dev version
+devtools::install_github(&amp;quot;zdebruine/MLdata&amp;quot;)&lt;/code&gt;&lt;/pre&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;library(RcppML)
+library(MLdata)
+library(ggplot2)
+library(cowplot)
+library(viridis)
+library(ggrepel)
+library(uwot)&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;div id=&#34;the-hawaiibirds-dataset&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;The hawaiibirds dataset&lt;/h2&gt;
+&lt;p&gt;The &lt;code&gt;MLdata::hawaiibirds&lt;/code&gt; dataset gives the frequency of bird species in small geographical grids throughout the state of Hawaii.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;data(hawaiibirds)
+hawaiibirds$counts[1:4, 1:4]&lt;/code&gt;&lt;/pre&gt;
+&lt;pre&gt;&lt;code&gt;## 4 x 4 sparse Matrix of class &amp;quot;dgCMatrix&amp;quot;
+##                                grid1      grid2       grid3      grid4
+## Common Myna               0.32432432 0.19230769 0.242753623 0.80208333
+## Black-crowned Night-Heron 0.06756757 0.07692308 0.007246377 0.03819444
+## Black Noddy               .          0.26923077 0.188405797 .         
+## Brown Noddy               .          0.38461538 .           .&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;A separate &lt;code&gt;metadata_h&lt;/code&gt; matrix gives the geographical coordinates and the corresponding island for each grid.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;head(hawaiibirds$metadata_h)&lt;/code&gt;&lt;/pre&gt;
+&lt;pre&gt;&lt;code&gt;##    grid island   lat     lng
+## 1 grid1   Maui 20.87 -156.44
+## 2 grid2   Oahu 21.33 -157.66
+## 3 grid3 Hawaii 19.33 -155.19
+## 4 grid4   Oahu 21.37 -157.94
+## 5 grid5 Hawaii 19.72 -155.11
+## 6 grid6   Maui 20.74 -156.24&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;And a separate &lt;code&gt;metadata_w&lt;/code&gt; matrix gives taxonomic information about each species in the database.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;head(hawaiibirds$metadata_w)&lt;/code&gt;&lt;/pre&gt;
+&lt;pre&gt;&lt;code&gt;##                     species             order
+## 1               Common Myna     Passeriformes
+## 2 Black-crowned Night-Heron    Pelecaniformes
+## 3               Black Noddy   Charadriiformes
+## 4               Brown Noddy   Charadriiformes
+## 5           Bulwer&amp;#39;s Petrel Procellariiformes
+## 6                Sooty Tern   Charadriiformes
+##                                     family       category     status
+## 1                    Sturnidae (Starlings) perching birds introduced
+## 2  Ardeidae (Herons, Egrets, and Bitterns)         waders     native
+## 3     Laridae (Gulls, Terns, and Skimmers)     shorebirds     native
+## 4     Laridae (Gulls, Terns, and Skimmers)     shorebirds     native
+## 5 Procellariidae (Shearwaters and Petrels)       seabirds     native
+## 6     Laridae (Gulls, Terns, and Skimmers)     shorebirds     native&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;div id=&#34;cross-validation-for-rank-determination&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Cross-validation for Rank Determination&lt;/h2&gt;
+&lt;p&gt;We can learn an NMF model to describe linear combinations of species across geographical grids. First we need to choose a rank.&lt;/p&gt;
+&lt;p&gt;The rank of a factorization is a crucial hyperparameter. One way to help decide on a rank is cross-validation. This is made easy using the &lt;code&gt;crossValidate&lt;/code&gt; function. See &lt;code&gt;?crossValidate&lt;/code&gt; for details on methods.&lt;/p&gt;
+&lt;p&gt;For many applications, there is no “optimal” rank. In this case, we do expect some amount of distinct biodiversity across the various islands, but within the islands there will be a continuum of habitat niches confounding rank of the signal. Additionally, there may be a number of “missing” observations where surveys were incomplete, which will confound signal separation.&lt;/p&gt;
+&lt;p&gt;Here we cross-validate across 3 independent replicates and plot the result:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;plot(crossValidate(hawaiibirds$counts, k = c(1:10, 12, 15, 20, 25, 30), reps = 3, verbose = FALSE))&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;https://zachdebruine.com/post/annotating-nmf-factors-with-sample-metadata/index.en_files/figure-html/unnamed-chunk-6-1.png&#34; width=&#34;384&#34; style=&#34;display: block; margin: auto auto auto 0;&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;We’ll choose a rank of &lt;code&gt;k = 10&lt;/code&gt; since this seems to capture much of the signal while giving identifiable factors.&lt;/p&gt;
+&lt;/div&gt;
+&lt;div id=&#34;run-robust-nmf&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Run robust NMF&lt;/h2&gt;
+&lt;p&gt;Let’s generate a high-quality NMF model across 10 random restarts at very low tolerance:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;model &amp;lt;- nmf(hawaiibirds$counts, k = 10, seed = 1:10, tol = 1e-6)&lt;/code&gt;&lt;/pre&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;model&lt;/code&gt;&lt;/pre&gt;
+&lt;pre&gt;&lt;code&gt;## 183 x 1183 x 10 factor model of class &amp;quot;nmf&amp;quot;
+## $ w
+##                                  nmf1        nmf2        nmf3       nmf4 nmf5
+## Common Myna               0.146640316 0.094888073 0.074299917 0.04111043    0
+## Black-crowned Night-Heron 0.006777407 0.004027294 0.005781633 0.00000000    0
+## Black Noddy               0.000000000 0.006376501 0.000000000 0.00000000    0
+## Brown Noddy               0.000000000 0.000000000 0.000000000 0.00000000    0
+## Bulwer&amp;#39;s Petrel           0.000000000 0.000000000 0.000000000 0.00000000    0
+## ...suppressing 178 rows and 5 columns
+## 
+## $ d
+## [1] 1350.6295 1256.2949 1153.2389  911.6537  834.4069
+## ...suppressing 5 values
+## 
+## $ h
+##             grid1        grid2        grid3       grid4        grid5
+## nmf1 0.0009274172 0.0004718018 0.0005553570 0.003512579 0.0006238265
+## nmf2 0.0001676291 0.0002334082 0.0009073722 0.000000000 0.0018705609
+## nmf3 0.0005758524 0.0000000000 0.0000000000 0.000000000 0.0005398256
+## nmf4 0.0000000000 0.0003021981 0.0000000000 0.003822848 0.0000000000
+## nmf5 0.0000000000 0.0000000000 0.0011624112 0.000000000 0.0000000000
+## ...suppressing 5 rows and 1178 columns
+## 
+## $ tol: 8.238107e-07 
+## $ iter: 67 
+## $ runtime: 0.9558601 sec&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;In the &lt;code&gt;w&lt;/code&gt; matrix we have factors describing communities of co-occuring bird species.&lt;/p&gt;
+&lt;p&gt;In the &lt;code&gt;h&lt;/code&gt; matrix we have the association of these bird communities in each surveyed geographical grid.&lt;/p&gt;
+&lt;/div&gt;
+&lt;div id=&#34;geographic-focus-on-nmf-factors&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Geographic focus on NMF factors&lt;/h2&gt;
+&lt;p&gt;What does each NMF factor tell us?&lt;/p&gt;
+&lt;p&gt;The sample embeddings matrix (&lt;code&gt;h&lt;/code&gt;) gives information about the geographical representation of each NMF factor across all grids. We’ll look at just the first four factors:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;plots &amp;lt;- list()
+for(i in 1:4){
+  df &amp;lt;- data.frame(
+    &amp;quot;lat&amp;quot; = hawaiibirds$metadata_h$lat,
+    &amp;quot;lng&amp;quot; = hawaiibirds$metadata_h$lng,
+    &amp;quot;nmf_factor&amp;quot; = model$h[i, ])
+  plots[[i]] &amp;lt;- ggplot(df, aes(x = lng, y = lat, color = nmf_factor)) +
+    geom_point() +
+    scale_color_viridis(option = &amp;quot;B&amp;quot;) +
+    theme_void() +
+    theme(legend.position = &amp;quot;none&amp;quot;, plot.title = element_text(hjust = 0.5)) + 
+    ggtitle(paste0(&amp;quot;Factor &amp;quot;, i))
+}
+plot_grid(plotlist = plots, nrow = 2)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;https://zachdebruine.com/post/annotating-nmf-factors-with-sample-metadata/index.en_files/figure-html/unnamed-chunk-9-1.png&#34; width=&#34;384&#34; style=&#34;display: block; margin: auto auto auto 0;&#34; /&gt;&lt;/p&gt;
+&lt;/div&gt;
+&lt;div id=&#34;metadata-enrichment-in-factors&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Metadata enrichment in factors&lt;/h2&gt;
+&lt;p&gt;Factor 2 is localized largely to the island of Hawaii, factor 3 to the island of Kauai, and factor 4 to Oahu.&lt;/p&gt;
+&lt;p&gt;Quantitatively, the &lt;code&gt;summary&lt;/code&gt; method for the &lt;code&gt;nmf&lt;/code&gt; S3 class makes it easy to annotate factors using metadata about samples or features. See &lt;code&gt;?summary.nmf&lt;/code&gt; for info.&lt;/p&gt;
+&lt;p&gt;In this case, we will use &lt;code&gt;summary&lt;/code&gt; to map factor enrichment in grids corresponding to each Hawaiian island, and species enrichment corresponding to each category.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;plot(summary(model, group_by = hawaiibirds$metadata_h$island, stat = &amp;quot;sum&amp;quot;))&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;https://zachdebruine.com/post/annotating-nmf-factors-with-sample-metadata/index.en_files/figure-html/unnamed-chunk-10-1.png&#34; width=&#34;384&#34; style=&#34;display: block; margin: auto auto auto 0;&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;In general, grids separate based on the island to which they belong – consistent with the expectation that islands contain distinct species communities.&lt;/p&gt;
+&lt;p&gt;Notice how several factors explain variation within the big island, “Hawaii”, consistent with the objective of NMF and the biological diversity within that island.&lt;/p&gt;
+&lt;p&gt;Due to our normalization method (&lt;code&gt;sum&lt;/code&gt;) very small islands with minor contribution to the model objective (i.e. Puuwai) are hardly represented.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;plot(summary(model, group_by = hawaiibirds$metadata_w$category, stat = &amp;quot;mean&amp;quot;))&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;https://zachdebruine.com/post/annotating-nmf-factors-with-sample-metadata/index.en_files/figure-html/unnamed-chunk-11-1.png&#34; width=&#34;384&#34; style=&#34;display: block; margin: auto auto auto 0;&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;Clearly, there is the greatest signal complexity among “perching birds”. &lt;code&gt;nmf10&lt;/code&gt; is describing “seabirds” while &lt;code&gt;nmf9&lt;/code&gt; is capturing much of the “non-perching birds” information.&lt;/p&gt;
+&lt;/div&gt;
+&lt;div id=&#34;nmf-biplots&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;NMF biplots&lt;/h2&gt;
+&lt;p&gt;Compare species composition in two factors that are both primarily restricted to the island of Hawaii, factors 7 and 8. The &lt;code&gt;biplot&lt;/code&gt; S3 method for &lt;code&gt;nmf&lt;/code&gt; makes this easy:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;biplot(model, factors = c(7, 8), matrix = &amp;quot;w&amp;quot;, group_by = hawaiibirds$metadata_w$category) + 
+  scale_y_continuous(trans = &amp;quot;sqrt&amp;quot;) + 
+  scale_x_continuous(trans = &amp;quot;sqrt&amp;quot;) +
+  geom_text_repel(size = 2.5, seed = 123, max.overlaps = 15)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;https://zachdebruine.com/post/annotating-nmf-factors-with-sample-metadata/index.en_files/figure-html/unnamed-chunk-12-1.png&#34; width=&#34;528&#34; style=&#34;display: block; margin: auto auto auto 0;&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;Factor 7 describes a wet rainforest community while Factor 8 describes dry rainforest/shrubland communities. Both factors are overwhelmingly focused on “perching birds”.&lt;/p&gt;
+&lt;/div&gt;
+&lt;div id=&#34;umap-on-nmf-embeddings&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;UMAP on NMF embeddings&lt;/h2&gt;
+&lt;p&gt;We might also be interested in visualizing how factors in &lt;span class=&#34;math inline&#34;&gt;\(w\)&lt;/span&gt; capture similarities among bird species using UMAP.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;set.seed(123)
+umap &amp;lt;- data.frame(uwot::umap(model$w))
+umap$taxon &amp;lt;- hawaiibirds$metadata_w$category
+umap$status &amp;lt;- hawaiibirds$metadata_w$status
+plot_grid(
+  ggplot(umap, aes(x = umap[,1], y = umap[,2], color = taxon)) +
+    geom_point() + theme_void(),
+  ggplot(umap, aes(x = umap[,1], y = umap[,2], color = status)) +
+    geom_point() + theme_void(),
+  nrow = 1
+)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;https://zachdebruine.com/post/annotating-nmf-factors-with-sample-metadata/index.en_files/figure-html/unnamed-chunk-13-1.png&#34; width=&#34;768&#34; style=&#34;display: block; margin: auto auto auto 0;&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;Species are classified based on habitat niche and taxonomic membership. Notice “seabirds” on the left, “perching birds” in the center mixed with “non-perching birds”, and a mix of “waders”, “waterfowl”, and “shorebirds” in the bottom right. There are also two distinct groups of “shorebirds” and “waterfowl”, consistent with distinct inland and shoreline communities.&lt;/p&gt;
+&lt;p&gt;Hawaii is extinction kingdom. For instance, more than 20 species of endemic honeycreeper have gone extinct in the past two centuries due to the establishment of introduced species and habitat devastation. Few remain. In the UMAP plot above on the right, we can observe that introduced species dominate habitat niches occupied by native perching and non-perching birds, a problem underlying historic and ongoing mass extinction events.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;set.seed(123)
+umap &amp;lt;- data.frame(uwot::umap(t(model$h)))
+umap$group &amp;lt;- hawaiibirds$metadata_h$island
+ggplot(umap, aes(x = umap[,1], y = umap[,2], color = group)) +
+  geom_point() + theme_void()&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;https://zachdebruine.com/post/annotating-nmf-factors-with-sample-metadata/index.en_files/figure-html/unnamed-chunk-14-1.png&#34; width=&#34;384&#34; style=&#34;display: block; margin: auto auto auto 0;&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;Islands are also well-defined by the NMF model.&lt;/p&gt;
+&lt;/div&gt;
+&lt;div id=&#34;defining-the-palila-species-niche&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Defining the “Palila” species niche&lt;/h2&gt;
+&lt;p&gt;The &lt;a href=&#34;https://ebird.org/media/catalog?taxonCode=palila&amp;amp;mediaType=p&amp;amp;sort=rating_rank_desc&amp;amp;q=Palila%20-%20Loxioides%20bailleui&#34;&gt;Palila&lt;/a&gt; is a highly endangered species that survives in small numbers on the eastern slopes of Mauna Kea on the dry island, in a shrubby dry “rainforest” biome. This biome is unique on the island of Hawaii.&lt;/p&gt;
+&lt;p&gt;What species coexist with the Palila?&lt;/p&gt;
+&lt;p&gt;Let’s find the highest factorization resolution at which a single factor describes the distribution of the Palila.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;palila &amp;lt;- list()
+for(rank in 1:20)
+  palila[[rank]] &amp;lt;- data.frame(
+    &amp;quot;value&amp;quot; = nmf(hawaiibirds$counts, k = rank, seed = 123, v = F)$w[&amp;quot;Palila&amp;quot;, ],
+    &amp;quot;rank&amp;quot; = rep(rank, rank)
+  )
+palila &amp;lt;- do.call(rbind, palila)
+ggplot(palila, aes(x = rank, y = value, color = factor(rank))) + geom_jitter(width = 0.1) + theme_classic() +
+  scale_color_manual(values = rep(c(&amp;quot;#F8766D&amp;quot;, &amp;quot;#00BDD0&amp;quot;), 10)) + labs(&amp;quot;Palila loading in factor&amp;quot;) + theme(legend.position = &amp;quot;none&amp;quot;)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;https://zachdebruine.com/post/annotating-nmf-factors-with-sample-metadata/index.en_files/figure-html/unnamed-chunk-15-1.png&#34; width=&#34;384&#34; style=&#34;display: block; margin: auto auto auto 0;&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;The model with a rank of 15 contains a factor in which the Palila is both important and specific.&lt;/p&gt;
+&lt;p&gt;Let’s have a look at the species composition in factor 15, specifically identifying which species are introduced and which are native:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;model &amp;lt;- nmf(hawaiibirds$counts, k = 15, seed = 123, v = F)
+df &amp;lt;- data.frame(&amp;quot;value&amp;quot; = model$w[, which.max(model$w[&amp;quot;Palila&amp;quot;, ])])
+df$status &amp;lt;- hawaiibirds$metadata_w$status
+df &amp;lt;- df[order(-df$value), ]
+df &amp;lt;- df[df$value &amp;gt; 0.001, ]
+df&lt;/code&gt;&lt;/pre&gt;
+&lt;pre&gt;&lt;code&gt;##                             value     status
+## Hawaii Amakihi        0.353110902     native
+## Warbling White-eye    0.188662129     native
+## House Finch           0.182132197 introduced
+## Erckel&amp;#39;s Francolin    0.066866618 introduced
+## Yellow-fronted Canary 0.045745828 introduced
+## California Quail      0.043372489     native
+## Palila                0.038791926     native
+## Eurasian Skylark      0.032193106 introduced
+## Hawaii Elepaio        0.028948444     native
+## Red-billed Leiothrix  0.008899639 introduced
+## Chukar                0.004825709 introduced
+## Indian Peafowl        0.003265103     native
+## Chinese Hwamei        0.002520935 introduced&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;The diet of the Palilla is largely seeds from the “mamame” tree, but also naio berries and mamame flowers, buds, and young leaves. What introduced perching birds may be competing with the Palila for these resources?&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;perching_birds &amp;lt;- hawaiibirds$metadata_w$species[hawaiibirds$metadata_w$category == &amp;quot;perching birds&amp;quot;]
+df[which(rownames(df) %in% perching_birds &amp;amp; df$status == &amp;quot;introduced&amp;quot;), ]&lt;/code&gt;&lt;/pre&gt;
+&lt;pre&gt;&lt;code&gt;##                             value     status
+## House Finch           0.182132197 introduced
+## Yellow-fronted Canary 0.045745828 introduced
+## Eurasian Skylark      0.032193106 introduced
+## Red-billed Leiothrix  0.008899639 introduced
+## Chinese Hwamei        0.002520935 introduced&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;The “House Finch” and “Yellow-fronted Canary” seem to be the most significant competitors in the Palila habitat niche.&lt;/p&gt;
+&lt;/div&gt;
+</description>
+    </item>
+    
+  </channel>
+</rss>

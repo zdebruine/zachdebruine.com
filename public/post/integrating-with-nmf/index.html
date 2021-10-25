@@ -1,0 +1,1091 @@
+<!DOCTYPE html><html lang="en-us" >
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  
+  
+  
+    <meta name="generator" content="Wowchemy 5.3.0 for Hugo" />
+  
+
+  
+
+  
+  
+  
+  
+  
+    
+    
+    
+  
+  
+
+  <meta name="author" content="Zach DeBruine" />
+
+  
+  
+  
+    
+  
+  <meta name="description" content="DNA methylation signatures in patients with Acute Myelogenous Leukemia are compared to healthy cell types to determine cell-of-origin. This is a great example of why source separation is necessary to integrate mixed or heterogenous signals. By using subsets of NMF factors, similarities between these signals are exposed." />
+
+  
+  <link rel="alternate" hreflang="en-us" href="https://zachdebruine.com/post/integrating-with-nmf/" />
+
+  
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+  
+  
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  
+
+  
+  
+  
+    <meta name="theme-color" content="#1565c0" />
+  
+
+  
+  
+
+  
+
+  <link rel="stylesheet" href="/css/vendor-bundle.min.f1ecf783c14edc00c9320c205831ad8e.css" media="print" onload="this.media='all'">
+
+  
+  
+  
+    
+    
+      <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/academicons/1.9.0/css/academicons.min.css" integrity="sha512-W4yqoT1+8NLkinBLBZko+dFB2ZbHsYLDdr50VElllRcNt2Q4/GSs6u71UHKxB7S6JEMCp5Ve4xjh3eGQl/HRvg==" crossorigin="anonymous" media="print" onload="this.media='all'">
+    
+
+    
+    
+    
+    
+      
+      
+    
+    
+    
+
+    
+    
+    
+      
+    
+    
+      
+      
+        
+          <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.2.0/styles/github.min.css" crossorigin="anonymous" title="hl-light" media="print" onload="this.media='all'">
+          <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.2.0/styles/dracula.min.css" crossorigin="anonymous" title="hl-dark" media="print" onload="this.media='all'" disabled>
+        
+      
+    
+
+    
+    
+    
+      <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/leaflet.min.css" integrity="sha512-1xoFisiGdy9nvho8EgXuXvnpR5GAMSjFwp40gSRE3NwdUdIMIKuPa7bqoUhLD0O/5tPNhteAsE5XyyMi5reQVA==" crossorigin="anonymous" media="print" onload="this.media='all'">
+    
+
+    
+
+    
+    
+      
+      
+
+      
+      
+
+      
+    
+      
+      
+
+      
+      
+
+      
+    
+      
+      
+
+      
+      
+
+      
+    
+      
+      
+
+      
+      
+
+      
+    
+      
+      
+
+      
+      
+
+      
+    
+      
+      
+
+      
+      
+
+      
+    
+      
+      
+
+      
+      
+
+      
+    
+      
+      
+
+      
+      
+
+      
+    
+      
+      
+
+      
+      
+
+      
+    
+      
+      
+
+      
+      
+
+      
+    
+      
+      
+
+      
+      
+
+      
+    
+      
+      
+
+      
+      
+
+      
+    
+      
+      
+
+      
+      
+        
+      
+
+      
+    
+      
+      
+
+      
+      
+
+      
+    
+      
+      
+
+      
+      
+
+      
+    
+  
+
+  
+  
+  
+    
+      
+      <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&family=Roboto+Mono&family=Roboto:wght@400;700&display=swap">
+      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&family=Roboto+Mono&family=Roboto:wght@400;700&display=swap" media="print" onload="this.media='all'">
+    
+  
+
+  
+  
+  
+  
+  
+  <link rel="stylesheet" href="/css/wowchemy.fb09bd065933df494dfc11df8e3c78fa.css" />
+
+  
+
+
+
+  
+
+  
+
+  
+
+
+
+
+  
+  
+  
+
+  
+
+  
+    <link rel="manifest" href="/manifest.webmanifest" />
+  
+
+  <link rel="icon" type="image/png" href="/media/icon_hu3a1a9d362c9f3f4d7273828c49d8e14c_75812_32x32_fill_lanczos_center_3.png" />
+  <link rel="apple-touch-icon" type="image/png" href="/media/icon_hu3a1a9d362c9f3f4d7273828c49d8e14c_75812_180x180_fill_lanczos_center_3.png" />
+
+  <link rel="canonical" href="https://zachdebruine.com/post/integrating-with-nmf/" />
+
+  
+  
+  
+  
+  
+  
+  
+  
+    
+  
+  
+  <meta property="twitter:card" content="summary_large_image" />
+  
+  <meta property="og:site_name" content="Zach DeBruine" />
+  <meta property="og:url" content="https://zachdebruine.com/post/integrating-with-nmf/" />
+  <meta property="og:title" content="Integrating Heterogenous Samples with NMF | Zach DeBruine" />
+  <meta property="og:description" content="DNA methylation signatures in patients with Acute Myelogenous Leukemia are compared to healthy cell types to determine cell-of-origin. This is a great example of why source separation is necessary to integrate mixed or heterogenous signals. By using subsets of NMF factors, similarities between these signals are exposed." /><meta property="og:image" content="https://zachdebruine.com/post/integrating-with-nmf/featured.png" />
+    <meta property="twitter:image" content="https://zachdebruine.com/post/integrating-with-nmf/featured.png" /><meta property="og:locale" content="en-us" />
+  
+    
+      <meta
+        property="article:published_time"
+        content="2021-10-12T00:00:00&#43;00:00"
+      />
+    
+    <meta property="article:modified_time" content="2021-10-12T00:00:00&#43;00:00">
+  
+
+  
+
+
+    
+
+
+
+
+
+
+  
+
+
+
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "mainEntityOfPage": {
+    "@type": "WebPage",
+    "@id": "https://zachdebruine.com/post/integrating-with-nmf/"
+  },
+  "headline": "Integrating Heterogenous Samples with NMF",
+  
+  "image": [
+    "https://zachdebruine.com/post/integrating-with-nmf/featured.png"
+  ],
+  
+  "datePublished": "2021-10-12T00:00:00Z",
+  "dateModified": "2021-10-12T00:00:00Z",
+  
+  "author": {
+    "@type": "Person",
+    "name": "Zach DeBruine"
+  },
+  
+  "publisher": {
+    "@type": "Organization",
+    "name": "Zach DeBruine",
+    "logo": {
+      "@type": "ImageObject",
+      "url": "https://zachdebruine.com/media/icon_hu3a1a9d362c9f3f4d7273828c49d8e14c_75812_192x192_fill_lanczos_center_3.png"
+    }
+  },
+  "description": "DNA methylation signatures in patients with Acute Myelogenous Leukemia are compared to healthy cell types to determine cell-of-origin. This is a great example of why source separation is necessary to integrate mixed or heterogenous signals. By using subsets of NMF factors, similarities between these signals are exposed."
+}
+</script>
+
+  
+
+  
+
+  
+
+  
+
+
+
+
+
+  <title>Integrating Heterogenous Samples with NMF | Zach DeBruine</title>
+</head>
+
+
+<body id="top" data-spy="scroll" data-offset="70" data-target="#TableOfContents" class="page-wrapper   " data-wc-page-id="790909b56f0712e24d7e9328ad5c3547" >
+
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  <script src="/js/wowchemy-init.min.7f3e7639f4c7f2a2cf83b68ea7de7f08.js"></script>
+
+  
+
+
+<aside class="search-modal" id="search">
+  <div class="container">
+    <section class="search-header">
+
+      <div class="row no-gutters justify-content-between mb-3">
+        <div class="col-6">
+          <h1>Search</h1>
+        </div>
+        <div class="col-6 col-search-close">
+          <a class="js-search" href="#" aria-label="Close"><i class="fas fa-times-circle text-muted" aria-hidden="true"></i></a>
+        </div>
+      </div>
+
+      <div id="search-box">
+        
+        <input name="q" id="search-query" placeholder="Search..." autocapitalize="off"
+        autocomplete="off" autocorrect="off" spellcheck="false" type="search" class="form-control"
+        aria-label="Search...">
+        
+      </div>
+
+      
+      
+
+      
+
+    </section>
+    <section class="section-search-results">
+
+      <div id="search-hits">
+        
+      </div>
+
+    </section>
+  </div>
+</aside>
+
+
+
+  <div class="page-header">
+    
+
+
+
+
+
+
+
+
+
+
+
+
+<nav class="navbar navbar-expand-lg navbar-light compensate-for-scrollbar" id="navbar-main">
+  <div class="container-xl">
+
+    
+    <div class="d-none d-lg-inline-flex">
+      <a class="navbar-brand" href="/">Zach DeBruine</a>
+    </div>
+    
+
+    
+    <button type="button" class="navbar-toggler" data-toggle="collapse"
+            data-target="#navbar-content" aria-controls="navbar-content" aria-expanded="false" aria-label="Toggle navigation">
+    <span><i class="fas fa-bars"></i></span>
+    </button>
+    
+
+    
+    <div class="navbar-brand-mobile-wrapper d-inline-flex d-lg-none">
+      <a class="navbar-brand" href="/">Zach DeBruine</a>
+    </div>
+    
+
+    
+    
+    <div class="navbar-collapse main-menu-item collapse justify-content-start" id="navbar-content">
+
+      
+      <ul class="navbar-nav d-md-inline-flex">
+        
+
+        
+
+        
+        
+        
+          
+        
+
+        
+
+        
+        
+        
+        
+
+        
+          
+            
+            
+          
+          
+            
+            
+            
+              
+            
+            
+          
+        
+
+        <li class="nav-item">
+          <a class="nav-link " href="/#posts"><span>Posts</span></a>
+        </li>
+
+        
+        
+
+        
+
+        
+        
+        
+          
+        
+
+        
+
+        
+        
+        
+        
+
+        
+          
+            
+            
+          
+          
+            
+            
+            
+              
+            
+            
+          
+        
+
+        <li class="nav-item">
+          <a class="nav-link " href="/#about"><span>About</span></a>
+        </li>
+
+        
+        
+
+      
+
+        
+      </ul>
+    </div>
+
+    <ul class="nav-icons navbar-nav flex-row ml-auto d-flex pl-md-2">
+
+      
+      
+        
+          
+          <li class="nav-item d-none d-lg-inline-flex">
+            <a class="nav-link" href="/"  aria-label="">
+              <i class="fas fa-" aria-hidden="true"></i>
+            </a>
+          </li>
+        
+      
+
+      
+      
+      <li class="nav-item">
+        <a class="nav-link js-search" href="#" aria-label="Search"><i class="fas fa-search" aria-hidden="true"></i></a>
+      </li>
+      
+
+      
+      
+
+      
+      
+
+    </ul>
+
+  </div>
+</nav>
+
+
+  </div>
+
+  <div class="page-body">
+    <article class="article">
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+  
+  
+<div class="article-container pt-3">
+  <h1>Integrating Heterogenous Samples with NMF</h1>
+
+  
+  <p class="page-subtitle">Aligning cancer methylation signatures with healthy cell-of-origin signatures</p>
+  
+
+  
+    
+
+
+<div class="article-metadata">
+
+  
+  
+
+  
+  <span class="article-date">
+    
+    
+      
+    
+    Oct 12, 2021
+  </span>
+  
+
+  
+
+  
+
+  
+  
+  
+  
+  
+  
+
+  
+  
+  <span class="middot-divider"></span>
+  <span class="article-categories">
+    <i class="fas fa-folder mr-1"></i><a href="/category/nmf/">NMF</a>, <a href="/category/integration/">integration</a></span>
+  
+
+</div>
+
+    
+
+
+
+
+
+  
+</div>
+
+
+
+  <div class="article-container">
+
+    <div class="article-style">
+      
+
+
+<div id="nmf-for-source-separation" class="section level2">
+<h2>NMF for source separation</h2>
+<p>One of the many applications of NMF is <a href="https://en.wikipedia.org/wiki/Signal_separation">source separation</a>, aka blind signal separation, where a mixture of signals are resolved in a factor model. Different samples will contain different signals, some unique, and some shared. The goal might be to visualize samples based on signals they share, or to identify discriminating signals.</p>
+</div>
+<div id="integrative-nmf" class="section level2">
+<h2>Integrative NMF?</h2>
+<p>Integrative NMF (iNMF) has been proposed for source separation and integration of heterogenous datasets (see <a href="https://github.com/welch-lab/liger">LIGER</a>). However, iNMF requires a regularization hyperparameter to enforce integration, and fitting is inherently slow.</p>
+<p>Instead, we can simply run NMF on all signals and then annotate what factors are specific to metadata of interest.</p>
+</div>
+<div id="cancer-vs.-healthy-cell-signatures" class="section level2">
+<h2>Cancer vs. healthy cell signatures</h2>
+<p>Classification of cancer cell-of-origin is a great example of source separation. Here, the challenge is to tease out signatures shared by cancer and healthy cell types to discover the cell type from which the cancer originated.</p>
+<p>We’ll use the <code>aml</code> dataset from the <code>MLdata</code> package:</p>
+<pre class="r"><code>devtools::install_github(&quot;zdebruine/MLdata&quot;)
+devtools::install_RcppML(&quot;zdebruine/RcppML&quot;)</code></pre>
+<pre class="r"><code>library(RcppML)
+library(MLdata)
+library(ggplot2)
+library(cowplot)
+library(umap)
+data(aml)</code></pre>
+<p>The <code>MLdata::aml</code> dataset contains samples from 123 patients with Acute Myelogenous Leukemia (AML) and 5 samples each for putative cells of origin (GMP, LMPP, or MEP cells) from healthy patients. Each sample contains information on ~800 differentially methylated regions (DMRs), a measure of gene expression signatures.</p>
+<pre class="r"><code>table(colnames(aml))</code></pre>
+<pre><code>## 
+## AML sample        GMP       LMPP        MEP 
+##        123          5          5          5</code></pre>
+<p>Since we have three cell types and cancer, we’ll choose a low factorization rank (<code>k = 5</code>). We’ll fit to machine-tolerances and input ten random seeds so that <code>RcppML::nmf</code> runs factorizations from ten unique random initializations, and returns the best model of the ten:</p>
+<pre class="r"><code>nmf_model &lt;- RcppML::nmf(aml, k = 5, tol = 1e-10, maxit = 1000, seed = 1:10, verbose = F)</code></pre>
+</div>
+<div id="annotating-signal-sources" class="section level2">
+<h2>Annotating signal sources</h2>
+<p>We can see which sample types are represented in each NMF factor:</p>
+<pre class="r"><code>plot(summary(nmf_model, group_by = colnames(aml), stat = &quot;mean&quot;))</code></pre>
+<p><img src="https://zachdebruine.com/post/integrating-with-nmf/index.en_files/figure-html/summary_plot-1.png" width="384" style="display: block; margin: auto auto auto 0;" /></p>
+<p>Notice how factor 3 almost exclusively describes methylation signal in healthy cells.</p>
+<p>Let’s plot factor 3 vs. factor 5:</p>
+<pre class="r"><code>biplot(nmf_model, factors = c(3, 5), matrix = &quot;h&quot;, group_by = colnames(aml))</code></pre>
+<p><img src="https://zachdebruine.com/post/integrating-with-nmf/index.en_files/figure-html/biplot-1.png" width="384" style="display: block; margin: auto auto auto 0;" /></p>
+<p>Clearly if we want to “integrate” cancer and healthy cells for the purposes of classifying cell-of-origin, we do not want to be including factor 3 in that analysis.</p>
+</div>
+<div id="umap-on-the-nmf-embedding" class="section level2">
+<h2>UMAP on the NMF embedding</h2>
+<p>Let’s learn a UMAP embedding of all samples on NMF coordinates using the full NMF model.</p>
+<pre class="r"><code>plot_umap &lt;- function(nmf_model){
+  set.seed(123)
+  u &lt;- uwot::umap(t(nmf_model$h), n_neighbors = 10, metric = &quot;cosine&quot;, min_dist = 0.3, spread = 1)
+  df &lt;- data.frame(&quot;umap1&quot; = u[, 1], &quot;umap2&quot; = u[, 2], &quot;group&quot; = colnames(nmf_model$h))
+  ggplot(df, aes(x = umap1, y = umap2, color = group)) + geom_point() + theme_void()
+}
+
+plot_umap(nmf_model)</code></pre>
+<p><img src="https://zachdebruine.com/post/integrating-with-nmf/index.en_files/figure-html/umap_all-1.png" width="288" style="display: block; margin: auto auto auto 0;" /></p>
+<p>Clearly there are fundamental differences between cancer and healthy cells.</p>
+</div>
+<div id="integrating-by-source-separation" class="section level2">
+<h2>Integrating by source separation</h2>
+<p>Let’s do the same as we did above, but now excluding factor 3:</p>
+<pre class="r"><code>plot_umap(nmf_model[-3])</code></pre>
+<p><img src="https://zachdebruine.com/post/integrating-with-nmf/index.en_files/figure-html/umap_integrated-1.png" width="288" style="display: block; margin: auto auto auto 0;" /></p>
+<p>Bingo! We are able to classify cancer cells based on healthy cell-of-origin!</p>
+<p>In conclusion, we were able to integrate cancer and healthy cell methylation signatures by finding factors describing variation they shared in common.</p>
+</div>
+
+    </div>
+
+    
+
+
+
+
+
+
+<div class="article-tags">
+  
+  <a class="badge badge-light" href="/tag/nmf/">NMF</a>
+  
+  <a class="badge badge-light" href="/tag/integration/">integration</a>
+  
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+
+
+
+  
+  
+  
+    
+  
+  
+  
+  <div class="media author-card content-widget-hr">
+    
+      
+      <a href="https://zachdebruine.com/"><img class="avatar mr-3 avatar-circle" src="/author/zach-debruine/avatar_hufe5cf19ab3862ec1ff7e31e2bfb05ae9_344625_270x270_fill_q75_lanczos_center.jpg" alt="Zach DeBruine"></a>
+    
+
+    <div class="media-body">
+      <h5 class="card-title"><a href="https://zachdebruine.com/">Zach DeBruine</a></h5>
+      <h6 class="card-subtitle">Postdoctoral Fellow in Bioinformatics</h6>
+      <p class="card-text">Postdoctoral fellow in bioinformatics interested in single-cell experiments and dimensional reduction. I love simple, fast, and common sense data analysis.</p>
+      <ul class="network-icon" aria-hidden="true">
+  
+    
+    
+    
+      
+    
+    
+    
+    
+    
+    <li>
+      <a href="mailto::zacharydebruine@gmail.com" >
+        <i class="fas fa-envelope"></i>
+      </a>
+    </li>
+  
+    
+    
+    
+      
+    
+    
+    
+    
+    
+      
+    
+    <li>
+      <a href="/" >
+        <i class="fas fa-"></i>
+      </a>
+    </li>
+  
+    
+    
+    
+    
+    
+    
+    
+      
+    
+    <li>
+      <a href="https://scholar.google.com/citations?user=l9qurb4AAAAJ" target="_blank" rel="noopener">
+        <i class="ai ai-google-scholar"></i>
+      </a>
+    </li>
+  
+    
+    
+    
+      
+    
+    
+    
+    
+    
+      
+    
+    <li>
+      <a href="https://github.com/zdebruine" target="_blank" rel="noopener">
+        <i class="fab fa-github"></i>
+      </a>
+    </li>
+  
+    
+    
+    
+      
+    
+    
+    
+    
+    
+      
+    
+    <li>
+      <a href="https://www.linkedin.com/in/zacharydebruine/" target="_blank" rel="noopener">
+        <i class="fab fa-linkedin"></i>
+      </a>
+    </li>
+  
+    
+    
+    
+    
+    
+    
+    
+      
+    
+    <li>
+      <a href="https://orcid.org/0000-0003-2234-4827/" target="_blank" rel="noopener">
+        <i class="ai ai-orcid"></i>
+      </a>
+    </li>
+  
+    
+    
+    
+      
+    
+    
+    
+    
+    
+      
+    
+    <li>
+      <a href="https://stackoverflow.com/users/1436247/zdebruine/" target="_blank" rel="noopener">
+        <i class="fab fa-stack-overflow"></i>
+      </a>
+    </li>
+  
+</ul>
+
+    </div>
+  </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+</article>
+  </div>
+
+  <div class="page-footer">
+    
+    
+    <div class="container">
+      
+
+    <script src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS_HTML"></script>
+    
+    <script type="text/x-mathjax-config">
+    MathJax.Hub.Config({
+        tex2jax: {
+            inlineMath: [ ['$','$'], ["\\(","\\)"] ],
+            displayMath: [ ['$$','$$'], ["\\[","\\]"] ],
+            processEscapes: true,
+            processEnvironments: true
+        },
+        // Center justify equations in code and markdown cells. Elsewhere
+        // we use CSS to left justify single line equations in code cells.
+        displayAlign: 'center',
+        "HTML-CSS": {
+            styles: {'.MathJax_Display': {"margin": 0}},
+            linebreaks: { automatic: true }
+        }
+    });
+    </script>
+    
+    </div>
+    
+  </div>
+
+  
+<div id="modal" class="modal fade" role="dialog">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Cite</h5>
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body">
+        <pre><code class="tex hljs"></code></pre>
+      </div>
+      <div class="modal-footer">
+        <a class="btn btn-outline-primary my-1 js-copy-cite" href="#" target="_blank">
+          <i class="fas fa-copy"></i> Copy
+        </a>
+        <a class="btn btn-outline-primary my-1 js-download-cite" href="#" target="_blank">
+          <i class="fas fa-download"></i> Download
+        </a>
+        <div id="modal-error"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+      
+
+    
+    <script src="/js/vendor-bundle.min.b73dfaac3b6499dc997741748a7c3fe2.js"></script>
+
+    
+    
+    
+      
+      
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.imagesloaded/4.1.4/imagesloaded.pkgd.min.js" integrity="sha256-lqvxZrPLtfffUl2G/e7szqSvPBILGbwmsGE1MKlOi0Q=" crossorigin="anonymous"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.isotope/3.0.6/isotope.pkgd.min.js" integrity="sha256-CBrpuqrMhXwcLLUd5tvQ4euBHCdh7wGlDfNz8vbu/iI=" crossorigin="anonymous"></script>
+      
+
+      
+      
+
+      
+
+      
+        
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.2.0/highlight.min.js" integrity="sha512-TDKKr+IvoqZnPzc3l35hdjpHD0m+b2EC2SrLEgKDRWpxf2rFCxemkgvJ5kfU48ip+Y+m2XVKyOCD85ybtlZDmw==" crossorigin="anonymous"></script>
+        
+        
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.2.0/languages/r.min.js" crossorigin="anonymous"></script>
+        
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.2.0/languages/python.min.js" crossorigin="anonymous"></script>
+        
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.2.0/languages/latex.min.js" crossorigin="anonymous"></script>
+        
+      
+
+    
+
+    
+    
+    
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/leaflet.min.js" integrity="sha512-SeiQaaDh73yrb56sTW/RgVdi/mMqNeM2oBwubFHagc5BkixSpP1fvqF47mKzPGWYSSy4RwbBunrJBQ4Co8fRWA==" crossorigin="anonymous"></script>
+    
+
+    
+    
+
+    
+    
+    
+      
+      <script id="search-hit-fuse-template" type="text/x-template">
+        <div class="search-hit" id="summary-{{key}}">
+          <div class="search-hit-content">
+            <div class="search-hit-name">
+              <a href="{{relpermalink}}">{{title}}</a>
+              <div class="article-metadata search-hit-type">{{type}}</div>
+              <p class="search-hit-description">{{snippet}}</p>
+            </div>
+          </div>
+        </div>
+      </script>
+      
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/fuse.js/3.2.1/fuse.min.js" integrity="sha256-VzgmKYmhsGNNN4Ph1kMW+BjoYJM2jV5i4IlFoeZA9XI=" crossorigin="anonymous"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/mark.js/8.11.1/jquery.mark.min.js" integrity="sha256-4HLtjeVgH0eIB3aZ9mLYF6E8oU5chNdjU6p6rrXpl9U=" crossorigin="anonymous"></script>
+      
+    
+
+    
+    
+
+    
+    
+    
+    
+
+    
+    
+      
+      
+      
+      
+      
+      
+      
+    
+
+    
+    
+    
+    
+    
+    
+    
+    
+      
+      
+    
+    
+    <script src="/en/js/wowchemy.min.d68ecd57c0ec1f1f61d65fd568f1c3a0.js"></script>
+
+    
+  <script async defer src="https://buttons.github.io/buttons.js"></script>
+
+
+
+
+</body>
+</html>

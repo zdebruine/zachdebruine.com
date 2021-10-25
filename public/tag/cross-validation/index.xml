@@ -1,0 +1,160 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>cross-validation | Zach DeBruine</title>
+    <link>https://zachdebruine.com/tag/cross-validation/</link>
+      <atom:link href="https://zachdebruine.com/tag/cross-validation/index.xml" rel="self" type="application/rss+xml" />
+    <description>cross-validation</description>
+    <generator>Wowchemy (https://wowchemy.com)</generator><language>en-us</language><copyright>© 2021 Zach DeBruine</copyright><lastBuildDate>Sun, 17 Oct 2021 00:00:00 +0000</lastBuildDate>
+    <image>
+      <url>https://zachdebruine.com/media/icon_hu3a1a9d362c9f3f4d7273828c49d8e14c_75812_512x512_fill_lanczos_center_3.png</url>
+      <title>cross-validation</title>
+      <link>https://zachdebruine.com/tag/cross-validation/</link>
+    </image>
+    
+    <item>
+      <title>Cross-validation for NMF rank determination</title>
+      <link>https://zachdebruine.com/post/cross-validation-for-nmf-rank-determination/</link>
+      <pubDate>Sun, 17 Oct 2021 00:00:00 +0000</pubDate>
+      <guid>https://zachdebruine.com/post/cross-validation-for-nmf-rank-determination/</guid>
+      <description>
+
+
+&lt;div id=&#34;cross-validation-for-nmf&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Cross-Validation for NMF&lt;/h2&gt;
+&lt;p&gt;Rank is the most important hyperparameter in NMF. Finding that “sweet spot” rank can make the difference between learning a useful model that captures meaningful signal (but not noise) or learning a garbage model that misses good signal or focuses too much on useless noise.&lt;/p&gt;
+&lt;p&gt;Alex Williams has posted a great introduction to cross-validation for NMF on his &lt;a href=&#34;http://alexhwilliams.info/itsneuronalblog/2018/02/26/crossval/&#34;&gt;blog&lt;/a&gt;. His review of the first two methods is particularly intuitive. However, the third method is both theoretically questionable and poor in practice.&lt;/p&gt;
+&lt;p&gt;There are three “unsupervised” cross-validation methods for NMF which I have found to be useful:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;Bi-cross-validation&lt;/strong&gt;, proposed by &lt;a href=&#34;https://projecteuclid.org/journals/annals-of-applied-statistics/volume-3/issue-2/Bi-cross-validation-of-the-SVD-and-the/10.1214/08-AOAS227.full&#34;&gt;Perry&lt;/a&gt; and explained simply by &lt;a href=&#34;http://alexhwilliams.info/itsneuronalblog/2018/02/26/crossval/&#34;&gt;Williams&lt;/a&gt;. The “Bi-” in “Bi-cross-validation” means that the model is trained on a block of randomly selected samples and features and evaluated on a non-intersecting block of samples and features. Thus, no samples or features in the test set are included in the training set. If the test and training sets contain samples in common, or features in common, NMF gets to “cheat” in training and directly infer patterns of regulation, and thus basic subsample-cross-validation with NMF does not work.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Imputation&lt;/strong&gt;, described nicely by &lt;a href=&#34;https://bmcbioinformatics.biomedcentral.com/articles/10.1186/s12859-019-3312-5&#34;&gt;Lin&lt;/a&gt; and also reviewed in this StackExchange post by &lt;a href=&#34;https://stats.stackexchange.com/questions/111205/how-to-choose-an-optimal-number-of-latent-factors-in-non-negative-matrix-factori&#34;&gt;amoeba&lt;/a&gt;. Here, a small fraction of values (i.e. 5%) are “masked” and considered as missing during factorization, and the mean squared error of the imputed values is calculated after model training.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Robustness&lt;/strong&gt; is simply the cosine similarity of matched factors in independent models trained on non-overlapping sample sets. The premise is that noise capture will result in low similarity, while efficient signal capture will result in high similarity. Furthermore, approximations which are too low-rank will not classify signals in the same manner, leading to poor factor matching.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/div&gt;
+&lt;div id=&#34;takeaways&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Takeaways&lt;/h2&gt;
+&lt;ul&gt;
+&lt;li&gt;The &lt;code&gt;project&lt;/code&gt; method (bi-cross-validation) is useful for well-conditioned signal.&lt;/li&gt;
+&lt;li&gt;The &lt;code&gt;robust&lt;/code&gt; method (similarity of independent factorizations) is generally the most informative for noisy data possibly suffering from signal dropout.&lt;/li&gt;
+&lt;li&gt;The &lt;code&gt;imputation&lt;/code&gt; method is the slowest of the three, but generally the most sensitive.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/div&gt;
+&lt;div id=&#34;install-rcppml&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Install RcppML&lt;/h2&gt;
+&lt;p&gt;Install the development version of RcppML:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;devtools::install_github(&amp;quot;zdebruine/RcppML&amp;quot;)&lt;/code&gt;&lt;/pre&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;library(RcppML)
+library(ggplot2)
+library(cowplot)
+library(umap)
+library(irlba)&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;div id=&#34;simulated-data&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Simulated data&lt;/h2&gt;
+&lt;p&gt;Simulated data is useful for demonstrating the utility of methods in response to adversarial perturbations such as noise or dropout.&lt;/p&gt;
+&lt;p&gt;We will first explore cross-validation using two simulated datasets generated with &lt;code&gt;simulateNMF&lt;/code&gt;:&lt;/p&gt;
+&lt;ol style=&#34;list-style-type: decimal&#34;&gt;
+&lt;li&gt;&lt;code&gt;data_clean&lt;/code&gt; will have no noise or signal dropout&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;data_dirty&lt;/code&gt; contains the same signal as &lt;code&gt;data_clean&lt;/code&gt;, but with a good amount of noise and dropout.&lt;/li&gt;
+&lt;/ol&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;data_clean &amp;lt;- simulateNMF(nrow = 200, ncol = 200, k = 5, noise = 0, dropout = 0, seed = 123)
+data_dirty &amp;lt;- simulateNMF(nrow = 200, ncol = 200, k = 5, noise = 0.5, dropout = 0.5, seed = 123)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Notice how &lt;code&gt;data_clean&lt;/code&gt; contains only 5 non-zero singular values, while &lt;code&gt;data_dirty&lt;/code&gt; does not:&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://zachdebruine.com/post/cross-validation-for-nmf-rank-determination/index.en_files/figure-html/unnamed-chunk-2-1.png&#34; width=&#34;240&#34; style=&#34;display: block; margin: auto auto auto 0;&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;We can use &lt;code&gt;RcppML::crossValidate&lt;/code&gt; to determine the rank of each dataset. The default method uses “bi-cross-validation”. See &lt;code&gt;?crossValidate&lt;/code&gt; for details.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;cv_clean &amp;lt;- crossValidate(data_clean, k = 1:10, method = &amp;quot;predict&amp;quot;, reps = 3, seed = 123)
+cv_dirty &amp;lt;- crossValidate(data_dirty, k = 1:10, method = &amp;quot;predict&amp;quot;, reps = 3, seed = 123)
+plot_grid(
+  plot(cv_clean) + ggtitle(&amp;quot;bi-cross-validation on\nclean dataset&amp;quot;),
+  plot(cv_dirty) + ggtitle(&amp;quot;bi-cross-validation on\ndirty dataset&amp;quot;), nrow = 1)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;https://zachdebruine.com/post/cross-validation-for-nmf-rank-determination/index.en_files/figure-html/unnamed-chunk-3-1.png&#34; width=&#34;576&#34; style=&#34;display: block; margin: auto auto auto 0;&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;crossValidate&lt;/code&gt; also supports another method which compares robustness of two factorizations on independent sample subsets.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;cv_clean &amp;lt;- crossValidate(data_clean, k = 1:10, method = &amp;quot;robust&amp;quot;, reps = 3, seed = 123)
+cv_dirty &amp;lt;- crossValidate(data_dirty, k = 1:10, method = &amp;quot;robust&amp;quot;, reps = 3, seed = 123)
+plot_grid(
+  plot(cv_clean) + ggtitle(&amp;quot;robust cross-validation on\nclean dataset&amp;quot;),
+  plot(cv_dirty) + ggtitle(&amp;quot;robust cross-validation on\ndirty dataset&amp;quot;), nrow = 1)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;https://zachdebruine.com/post/cross-validation-for-nmf-rank-determination/index.en_files/figure-html/unnamed-chunk-4-1.png&#34; width=&#34;576&#34; style=&#34;display: block; margin: auto auto auto 0;&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;This second method does better on ill-conditioned data because it measures the robustness between independent factorizations.&lt;/p&gt;
+&lt;p&gt;Finally, we can use the &lt;code&gt;impute&lt;/code&gt; method:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;cv_clean &amp;lt;- crossValidate(data_clean, k = 1:10, method = &amp;quot;impute&amp;quot;, reps = 3, seed = 123)
+cv_dirty &amp;lt;- crossValidate(data_dirty, k = 1:10, method = &amp;quot;impute&amp;quot;, reps = 3, seed = 123)
+plot_grid(
+  plot(cv_clean) + ggtitle(&amp;quot;impute cross-validation on\nclean dataset&amp;quot;) + scale_y_continuous(trans = &amp;quot;log10&amp;quot;),
+  plot(cv_dirty) + ggtitle(&amp;quot;impute cross-validation on\ndirty dataset&amp;quot;) + scale_y_continuous(trans = &amp;quot;log10&amp;quot;), nrow = 1)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;https://zachdebruine.com/post/cross-validation-for-nmf-rank-determination/index.en_files/figure-html/unnamed-chunk-5-1.png&#34; width=&#34;576&#34; style=&#34;display: block; margin: auto auto auto 0;&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;For real datasets, it is important to experiment with both cross-validation methods and to explore multi-resolution analysis or other objectives where appropriate.&lt;/p&gt;
+&lt;p&gt;Let’s take a look at a real dataset:&lt;/p&gt;
+&lt;/div&gt;
+&lt;div id=&#34;finding-the-rank-of-the-hawaiibirds-dataset&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Finding the rank of the &lt;code&gt;hawaiibirds&lt;/code&gt; dataset&lt;/h2&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;data(hawaiibirds)
+A &amp;lt;- hawaiibirds$counts
+cv_predict &amp;lt;- crossValidate(A, k = 1:20, method = &amp;quot;predict&amp;quot;, reps = 3, seed = 123)
+cv_robust &amp;lt;- crossValidate(A, k = 1:20, method = &amp;quot;robust&amp;quot;, reps = 3, seed = 123)
+cv_impute &amp;lt;- crossValidate(A, k = 1:20, method = &amp;quot;impute&amp;quot;, reps = 3, seed = 123)
+plot_grid(
+  plot(cv_predict) + ggtitle(&amp;quot;method = &amp;#39;predict&amp;#39;&amp;quot;) + theme(legend.position = &amp;quot;none&amp;quot;),
+  plot(cv_robust) + ggtitle(&amp;quot;method = &amp;#39;robust&amp;#39;&amp;quot;) + theme(legend.position = &amp;quot;none&amp;quot;),
+  plot(cv_impute) + ggtitle(&amp;quot;method = &amp;#39;impute&amp;#39;&amp;quot;) + scale_y_continuous(trans = &amp;quot;log10&amp;quot;) + theme(legend.position = &amp;quot;none&amp;quot;),
+  get_legend(plot(cv_predict)), rel_widths = c(1, 1, 1, 0.4), nrow = 1, labels = &amp;quot;auto&amp;quot;)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;https://zachdebruine.com/post/cross-validation-for-nmf-rank-determination/index.en_files/figure-html/unnamed-chunk-6-1.png&#34; width=&#34;768&#34; style=&#34;display: block; margin: auto auto auto 0;&#34; /&gt;&lt;/p&gt;
+&lt;/div&gt;
+&lt;div id=&#34;finding-the-rank-of-the-aml-dataset&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Finding the rank of the &lt;code&gt;aml&lt;/code&gt; dataset&lt;/h2&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;data(aml)
+cv_impute &amp;lt;- crossValidate(aml, k = 2:14, method = &amp;quot;impute&amp;quot;, reps = 3, seed = 123)
+plot(cv_impute) + scale_y_continuous(trans = &amp;quot;log10&amp;quot;)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;https://zachdebruine.com/post/cross-validation-for-nmf-rank-determination/index.en_files/figure-html/unnamed-chunk-7-1.png&#34; width=&#34;768&#34; style=&#34;display: block; margin: auto auto auto 0;&#34; /&gt;&lt;/p&gt;
+&lt;/div&gt;
+&lt;div id=&#34;technical-considerations&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Technical considerations&lt;/h2&gt;
+&lt;p&gt;Runtime is a major consideration for large datasets. Unfortunately, missing value imputation can be very slow.&lt;/p&gt;
+&lt;/div&gt;
+&lt;div id=&#34;perturb&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Perturb&lt;/h2&gt;
+&lt;p&gt;Compare missing value imputation with perturb (zeros) and perturb (random):&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;data(hawaiibirds)
+data(aml)
+data(movielens)
+library(Seurat)&lt;/code&gt;&lt;/pre&gt;
+&lt;pre&gt;&lt;code&gt;## Warning: package &amp;#39;Seurat&amp;#39; was built under R version 4.0.5&lt;/code&gt;&lt;/pre&gt;
+&lt;pre&gt;&lt;code&gt;## Attaching SeuratObject&lt;/code&gt;&lt;/pre&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;library(SeuratData)&lt;/code&gt;&lt;/pre&gt;
+&lt;pre&gt;&lt;code&gt;## Registered S3 method overwritten by &amp;#39;cli&amp;#39;:
+##   method     from         
+##   print.boxx spatstat.geom&lt;/code&gt;&lt;/pre&gt;
+&lt;pre&gt;&lt;code&gt;## -- Installed datasets ------------------------------------- SeuratData v0.2.1 --&lt;/code&gt;&lt;/pre&gt;
+&lt;pre&gt;&lt;code&gt;## v bmcite       0.3.0                    v pbmc3k       3.1.4
+## v hcabm40k     3.0.0                    v pbmcMultiome 0.1.0
+## v ifnb         3.1.0                    v pbmcsca      3.0.0
+## v panc8        3.0.2                    v stxBrain     0.1.1&lt;/code&gt;&lt;/pre&gt;
+&lt;pre&gt;&lt;code&gt;## -------------------------------------- Key -------------------------------------&lt;/code&gt;&lt;/pre&gt;
+&lt;pre&gt;&lt;code&gt;## v Dataset loaded successfully
+## &amp;gt; Dataset built with a newer version of Seurat than installed
+## (?) Unknown version of Seurat installed&lt;/code&gt;&lt;/pre&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;pbmc3k&lt;/code&gt;&lt;/pre&gt;
+&lt;pre&gt;&lt;code&gt;## An object of class Seurat 
+## 13714 features across 2700 samples within 1 assay 
+## Active assay: RNA (13714 features, 0 variable features)&lt;/code&gt;&lt;/pre&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;A &amp;lt;- pbmc3k@assays$RNA@counts
+
+n &amp;lt;- 0.2
+method = &amp;quot;impute&amp;quot;
+cv1 &amp;lt;- crossValidate(A, k = 1:15, method = method, reps = 3, seed = 123, perturb_to = &amp;quot;random&amp;quot;, n = n)
+cv2 &amp;lt;- crossValidate(aml, k = 1:15, method = method, reps = 3, seed = 123, perturb_to = &amp;quot;random&amp;quot;, n = n)
+cv3 &amp;lt;- crossValidate(movielens$ratings, k = 1:15, method = method, reps = 3, seed = 123, perturb_to = &amp;quot;random&amp;quot;, n = n)
+cv4 &amp;lt;- crossValidate(hawaiibirds$counts, k = 1:15, method = method, reps = 3, seed = 123, perturb_to = &amp;quot;random&amp;quot;, n = n)
+plot_grid(
+  plot(cv1) + theme(legend.position = &amp;quot;none&amp;quot;) + scale_y_continuous(trans = &amp;quot;log10&amp;quot;),
+  plot(cv2) + theme(legend.position = &amp;quot;none&amp;quot;) + scale_y_continuous(trans = &amp;quot;log10&amp;quot;),
+  plot(cv3) + theme(legend.position = &amp;quot;none&amp;quot;) + scale_y_continuous(trans = &amp;quot;log10&amp;quot;),
+  plot(cv4) + theme(legend.position = &amp;quot;none&amp;quot;) + scale_y_continuous(trans = &amp;quot;log10&amp;quot;),
+  nrow = 2)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;https://zachdebruine.com/post/cross-validation-for-nmf-rank-determination/index.en_files/figure-html/unnamed-chunk-8-1.png&#34; width=&#34;768&#34; style=&#34;display: block; margin: auto auto auto 0;&#34; /&gt;&lt;/p&gt;
+&lt;/div&gt;
+</description>
+    </item>
+    
+  </channel>
+</rss>

@@ -1,0 +1,1246 @@
+<!DOCTYPE html><html lang="en-us" >
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  
+  
+  
+    <meta name="generator" content="Wowchemy 5.3.0 for Hugo" />
+  
+
+  
+
+  
+  
+  
+  
+  
+    
+    
+    
+  
+  
+
+  <meta name="author" content="Zach DeBruine" />
+
+  
+  
+  
+    
+  
+  <meta name="description" content="Use the Hawaii Birds dataset to show how to annotate factors in NMF models using metadata, with some interesting UMAP visualizations and applications to ecology along the way." />
+
+  
+  <link rel="alternate" hreflang="en-us" href="https://zachdebruine.com/post/annotating-nmf-factors-with-sample-metadata/" />
+
+  
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+  
+  
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  
+
+  
+  
+  
+    <meta name="theme-color" content="#1565c0" />
+  
+
+  
+  
+
+  
+
+  <link rel="stylesheet" href="/css/vendor-bundle.min.f1ecf783c14edc00c9320c205831ad8e.css" media="print" onload="this.media='all'">
+
+  
+  
+  
+    
+    
+      <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/academicons/1.9.0/css/academicons.min.css" integrity="sha512-W4yqoT1+8NLkinBLBZko+dFB2ZbHsYLDdr50VElllRcNt2Q4/GSs6u71UHKxB7S6JEMCp5Ve4xjh3eGQl/HRvg==" crossorigin="anonymous" media="print" onload="this.media='all'">
+    
+
+    
+    
+    
+    
+      
+      
+    
+    
+    
+
+    
+    
+    
+      
+    
+    
+      
+      
+        
+          <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.2.0/styles/github.min.css" crossorigin="anonymous" title="hl-light" media="print" onload="this.media='all'">
+          <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.2.0/styles/dracula.min.css" crossorigin="anonymous" title="hl-dark" media="print" onload="this.media='all'" disabled>
+        
+      
+    
+
+    
+    
+    
+      <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/leaflet.min.css" integrity="sha512-1xoFisiGdy9nvho8EgXuXvnpR5GAMSjFwp40gSRE3NwdUdIMIKuPa7bqoUhLD0O/5tPNhteAsE5XyyMi5reQVA==" crossorigin="anonymous" media="print" onload="this.media='all'">
+    
+
+    
+
+    
+    
+      
+      
+
+      
+      
+
+      
+    
+      
+      
+
+      
+      
+
+      
+    
+      
+      
+
+      
+      
+
+      
+    
+      
+      
+
+      
+      
+
+      
+    
+      
+      
+
+      
+      
+
+      
+    
+      
+      
+
+      
+      
+
+      
+    
+      
+      
+
+      
+      
+
+      
+    
+      
+      
+
+      
+      
+
+      
+    
+      
+      
+
+      
+      
+
+      
+    
+      
+      
+
+      
+      
+
+      
+    
+      
+      
+
+      
+      
+
+      
+    
+      
+      
+
+      
+      
+
+      
+    
+      
+      
+
+      
+      
+        
+      
+
+      
+    
+      
+      
+
+      
+      
+
+      
+    
+      
+      
+
+      
+      
+
+      
+    
+  
+
+  
+  
+  
+    
+      
+      <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&family=Roboto+Mono&family=Roboto:wght@400;700&display=swap">
+      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&family=Roboto+Mono&family=Roboto:wght@400;700&display=swap" media="print" onload="this.media='all'">
+    
+  
+
+  
+  
+  
+  
+  
+  <link rel="stylesheet" href="/css/wowchemy.fb09bd065933df494dfc11df8e3c78fa.css" />
+
+  
+
+
+
+  
+
+  
+
+  
+
+
+
+
+  
+  
+  
+
+  
+
+  
+    <link rel="manifest" href="/manifest.webmanifest" />
+  
+
+  <link rel="icon" type="image/png" href="/media/icon_hu3a1a9d362c9f3f4d7273828c49d8e14c_75812_32x32_fill_lanczos_center_3.png" />
+  <link rel="apple-touch-icon" type="image/png" href="/media/icon_hu3a1a9d362c9f3f4d7273828c49d8e14c_75812_180x180_fill_lanczos_center_3.png" />
+
+  <link rel="canonical" href="https://zachdebruine.com/post/annotating-nmf-factors-with-sample-metadata/" />
+
+  
+  
+  
+  
+  
+  
+  
+  
+    
+  
+  
+  <meta property="twitter:card" content="summary_large_image" />
+  
+  <meta property="og:site_name" content="Zach DeBruine" />
+  <meta property="og:url" content="https://zachdebruine.com/post/annotating-nmf-factors-with-sample-metadata/" />
+  <meta property="og:title" content="Annotating NMF factors with sample metadata | Zach DeBruine" />
+  <meta property="og:description" content="Use the Hawaii Birds dataset to show how to annotate factors in NMF models using metadata, with some interesting UMAP visualizations and applications to ecology along the way." /><meta property="og:image" content="https://zachdebruine.com/post/annotating-nmf-factors-with-sample-metadata/featured.png" />
+    <meta property="twitter:image" content="https://zachdebruine.com/post/annotating-nmf-factors-with-sample-metadata/featured.png" /><meta property="og:locale" content="en-us" />
+  
+    
+      <meta
+        property="article:published_time"
+        content="2021-10-12T00:00:00&#43;00:00"
+      />
+    
+    <meta property="article:modified_time" content="2021-10-12T00:00:00&#43;00:00">
+  
+
+  
+
+
+    
+
+
+
+
+
+
+  
+
+
+
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "mainEntityOfPage": {
+    "@type": "WebPage",
+    "@id": "https://zachdebruine.com/post/annotating-nmf-factors-with-sample-metadata/"
+  },
+  "headline": "Annotating NMF factors with sample metadata",
+  
+  "image": [
+    "https://zachdebruine.com/post/annotating-nmf-factors-with-sample-metadata/featured.png"
+  ],
+  
+  "datePublished": "2021-10-12T00:00:00Z",
+  "dateModified": "2021-10-12T00:00:00Z",
+  
+  "author": {
+    "@type": "Person",
+    "name": "Zach DeBruine"
+  },
+  
+  "publisher": {
+    "@type": "Organization",
+    "name": "Zach DeBruine",
+    "logo": {
+      "@type": "ImageObject",
+      "url": "https://zachdebruine.com/media/icon_hu3a1a9d362c9f3f4d7273828c49d8e14c_75812_192x192_fill_lanczos_center_3.png"
+    }
+  },
+  "description": "Use the Hawaii Birds dataset to show how to annotate factors in NMF models using metadata, with some interesting UMAP visualizations and applications to ecology along the way."
+}
+</script>
+
+  
+
+  
+
+  
+
+  
+
+
+
+
+
+  <title>Annotating NMF factors with sample metadata | Zach DeBruine</title>
+</head>
+
+
+<body id="top" data-spy="scroll" data-offset="70" data-target="#TableOfContents" class="page-wrapper   " data-wc-page-id="6f36f872236bb04d1e60b3c7d4ceac00" >
+
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  <script src="/js/wowchemy-init.min.7f3e7639f4c7f2a2cf83b68ea7de7f08.js"></script>
+
+  
+
+
+<aside class="search-modal" id="search">
+  <div class="container">
+    <section class="search-header">
+
+      <div class="row no-gutters justify-content-between mb-3">
+        <div class="col-6">
+          <h1>Search</h1>
+        </div>
+        <div class="col-6 col-search-close">
+          <a class="js-search" href="#" aria-label="Close"><i class="fas fa-times-circle text-muted" aria-hidden="true"></i></a>
+        </div>
+      </div>
+
+      <div id="search-box">
+        
+        <input name="q" id="search-query" placeholder="Search..." autocapitalize="off"
+        autocomplete="off" autocorrect="off" spellcheck="false" type="search" class="form-control"
+        aria-label="Search...">
+        
+      </div>
+
+      
+      
+
+      
+
+    </section>
+    <section class="section-search-results">
+
+      <div id="search-hits">
+        
+      </div>
+
+    </section>
+  </div>
+</aside>
+
+
+
+  <div class="page-header">
+    
+
+
+
+
+
+
+
+
+
+
+
+
+<nav class="navbar navbar-expand-lg navbar-light compensate-for-scrollbar" id="navbar-main">
+  <div class="container-xl">
+
+    
+    <div class="d-none d-lg-inline-flex">
+      <a class="navbar-brand" href="/">Zach DeBruine</a>
+    </div>
+    
+
+    
+    <button type="button" class="navbar-toggler" data-toggle="collapse"
+            data-target="#navbar-content" aria-controls="navbar-content" aria-expanded="false" aria-label="Toggle navigation">
+    <span><i class="fas fa-bars"></i></span>
+    </button>
+    
+
+    
+    <div class="navbar-brand-mobile-wrapper d-inline-flex d-lg-none">
+      <a class="navbar-brand" href="/">Zach DeBruine</a>
+    </div>
+    
+
+    
+    
+    <div class="navbar-collapse main-menu-item collapse justify-content-start" id="navbar-content">
+
+      
+      <ul class="navbar-nav d-md-inline-flex">
+        
+
+        
+
+        
+        
+        
+          
+        
+
+        
+
+        
+        
+        
+        
+
+        
+          
+            
+            
+          
+          
+            
+            
+            
+              
+            
+            
+          
+        
+
+        <li class="nav-item">
+          <a class="nav-link " href="/#posts"><span>Posts</span></a>
+        </li>
+
+        
+        
+
+        
+
+        
+        
+        
+          
+        
+
+        
+
+        
+        
+        
+        
+
+        
+          
+            
+            
+          
+          
+            
+            
+            
+              
+            
+            
+          
+        
+
+        <li class="nav-item">
+          <a class="nav-link " href="/#about"><span>About</span></a>
+        </li>
+
+        
+        
+
+      
+
+        
+      </ul>
+    </div>
+
+    <ul class="nav-icons navbar-nav flex-row ml-auto d-flex pl-md-2">
+
+      
+      
+        
+          
+          <li class="nav-item d-none d-lg-inline-flex">
+            <a class="nav-link" href="/"  aria-label="">
+              <i class="fas fa-" aria-hidden="true"></i>
+            </a>
+          </li>
+        
+      
+
+      
+      
+      <li class="nav-item">
+        <a class="nav-link js-search" href="#" aria-label="Search"><i class="fas fa-search" aria-hidden="true"></i></a>
+      </li>
+      
+
+      
+      
+
+      
+      
+
+    </ul>
+
+  </div>
+</nav>
+
+
+  </div>
+
+  <div class="page-body">
+    <article class="article">
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+  
+  
+<div class="article-container pt-3">
+  <h1>Annotating NMF factors with sample metadata</h1>
+
+  
+  <p class="page-subtitle">Learning bird species communities within the Hawaiian islands</p>
+  
+
+  
+    
+
+
+<div class="article-metadata">
+
+  
+  
+
+  
+  <span class="article-date">
+    
+    
+      
+    
+    Oct 12, 2021
+  </span>
+  
+
+  
+
+  
+
+  
+  
+  
+  
+  
+  
+
+  
+  
+  <span class="middot-divider"></span>
+  <span class="article-categories">
+    <i class="fas fa-folder mr-1"></i><a href="/category/nmf/">NMF</a>, <a href="/category/annotation/">annotation</a></span>
+  
+
+</div>
+
+    
+
+
+
+
+
+  
+</div>
+
+
+
+  <div class="article-container">
+
+    <div class="article-style">
+      
+
+
+<div id="annotating-nmf-factors" class="section level2">
+<h2>Annotating NMF factors</h2>
+<p>NMF learns an interpretable low-rank representation of data. However, how do we make sense of the factors in this low-rank latent model? A great way to begin annotating a latent space is to simply map it back to known sample and feature traits.</p>
+<p>This vignette demonstrates these concepts using an NMF model of bird species communities throughout the Hawaiian islands.</p>
+</div>
+<div id="install-rcppml" class="section level2">
+<h2>Install RcppML</h2>
+<p>Install the RcppML R package from CRAN or the development version from GitHub. Also install the accompanying Machine Learning datasets (MLdata) package:</p>
+<pre class="r"><code>install.packages(&#39;RcppML&#39;)                     # install CRAN version
+# devtools::install_github(&quot;zdebruine/RcppML&quot;) # compile dev version
+devtools::install_github(&quot;zdebruine/MLdata&quot;)</code></pre>
+<pre class="r"><code>library(RcppML)
+library(MLdata)
+library(ggplot2)
+library(cowplot)
+library(viridis)
+library(ggrepel)
+library(uwot)</code></pre>
+</div>
+<div id="the-hawaiibirds-dataset" class="section level2">
+<h2>The hawaiibirds dataset</h2>
+<p>The <code>MLdata::hawaiibirds</code> dataset gives the frequency of bird species in small geographical grids throughout the state of Hawaii.</p>
+<pre class="r"><code>data(hawaiibirds)
+hawaiibirds$counts[1:4, 1:4]</code></pre>
+<pre><code>## 4 x 4 sparse Matrix of class &quot;dgCMatrix&quot;
+##                                grid1      grid2       grid3      grid4
+## Common Myna               0.32432432 0.19230769 0.242753623 0.80208333
+## Black-crowned Night-Heron 0.06756757 0.07692308 0.007246377 0.03819444
+## Black Noddy               .          0.26923077 0.188405797 .         
+## Brown Noddy               .          0.38461538 .           .</code></pre>
+<p>A separate <code>metadata_h</code> matrix gives the geographical coordinates and the corresponding island for each grid.</p>
+<pre class="r"><code>head(hawaiibirds$metadata_h)</code></pre>
+<pre><code>##    grid island   lat     lng
+## 1 grid1   Maui 20.87 -156.44
+## 2 grid2   Oahu 21.33 -157.66
+## 3 grid3 Hawaii 19.33 -155.19
+## 4 grid4   Oahu 21.37 -157.94
+## 5 grid5 Hawaii 19.72 -155.11
+## 6 grid6   Maui 20.74 -156.24</code></pre>
+<p>And a separate <code>metadata_w</code> matrix gives taxonomic information about each species in the database.</p>
+<pre class="r"><code>head(hawaiibirds$metadata_w)</code></pre>
+<pre><code>##                     species             order
+## 1               Common Myna     Passeriformes
+## 2 Black-crowned Night-Heron    Pelecaniformes
+## 3               Black Noddy   Charadriiformes
+## 4               Brown Noddy   Charadriiformes
+## 5           Bulwer&#39;s Petrel Procellariiformes
+## 6                Sooty Tern   Charadriiformes
+##                                     family       category     status
+## 1                    Sturnidae (Starlings) perching birds introduced
+## 2  Ardeidae (Herons, Egrets, and Bitterns)         waders     native
+## 3     Laridae (Gulls, Terns, and Skimmers)     shorebirds     native
+## 4     Laridae (Gulls, Terns, and Skimmers)     shorebirds     native
+## 5 Procellariidae (Shearwaters and Petrels)       seabirds     native
+## 6     Laridae (Gulls, Terns, and Skimmers)     shorebirds     native</code></pre>
+</div>
+<div id="cross-validation-for-rank-determination" class="section level2">
+<h2>Cross-validation for Rank Determination</h2>
+<p>We can learn an NMF model to describe linear combinations of species across geographical grids. First we need to choose a rank.</p>
+<p>The rank of a factorization is a crucial hyperparameter. One way to help decide on a rank is cross-validation. This is made easy using the <code>crossValidate</code> function. See <code>?crossValidate</code> for details on methods.</p>
+<p>For many applications, there is no “optimal” rank. In this case, we do expect some amount of distinct biodiversity across the various islands, but within the islands there will be a continuum of habitat niches confounding rank of the signal. Additionally, there may be a number of “missing” observations where surveys were incomplete, which will confound signal separation.</p>
+<p>Here we cross-validate across 3 independent replicates and plot the result:</p>
+<pre class="r"><code>plot(crossValidate(hawaiibirds$counts, k = c(1:10, 12, 15, 20, 25, 30), reps = 3, verbose = FALSE))</code></pre>
+<p><img src="https://zachdebruine.com/post/annotating-nmf-factors-with-sample-metadata/index.en_files/figure-html/unnamed-chunk-6-1.png" width="384" style="display: block; margin: auto auto auto 0;" /></p>
+<p>We’ll choose a rank of <code>k = 10</code> since this seems to capture much of the signal while giving identifiable factors.</p>
+</div>
+<div id="run-robust-nmf" class="section level2">
+<h2>Run robust NMF</h2>
+<p>Let’s generate a high-quality NMF model across 10 random restarts at very low tolerance:</p>
+<pre class="r"><code>model &lt;- nmf(hawaiibirds$counts, k = 10, seed = 1:10, tol = 1e-6)</code></pre>
+<pre class="r"><code>model</code></pre>
+<pre><code>## 183 x 1183 x 10 factor model of class &quot;nmf&quot;
+## $ w
+##                                  nmf1        nmf2        nmf3       nmf4 nmf5
+## Common Myna               0.146640316 0.094888073 0.074299917 0.04111043    0
+## Black-crowned Night-Heron 0.006777407 0.004027294 0.005781633 0.00000000    0
+## Black Noddy               0.000000000 0.006376501 0.000000000 0.00000000    0
+## Brown Noddy               0.000000000 0.000000000 0.000000000 0.00000000    0
+## Bulwer&#39;s Petrel           0.000000000 0.000000000 0.000000000 0.00000000    0
+## ...suppressing 178 rows and 5 columns
+## 
+## $ d
+## [1] 1350.6295 1256.2949 1153.2389  911.6537  834.4069
+## ...suppressing 5 values
+## 
+## $ h
+##             grid1        grid2        grid3       grid4        grid5
+## nmf1 0.0009274172 0.0004718018 0.0005553570 0.003512579 0.0006238265
+## nmf2 0.0001676291 0.0002334082 0.0009073722 0.000000000 0.0018705609
+## nmf3 0.0005758524 0.0000000000 0.0000000000 0.000000000 0.0005398256
+## nmf4 0.0000000000 0.0003021981 0.0000000000 0.003822848 0.0000000000
+## nmf5 0.0000000000 0.0000000000 0.0011624112 0.000000000 0.0000000000
+## ...suppressing 5 rows and 1178 columns
+## 
+## $ tol: 8.238107e-07 
+## $ iter: 67 
+## $ runtime: 0.9558601 sec</code></pre>
+<p>In the <code>w</code> matrix we have factors describing communities of co-occuring bird species.</p>
+<p>In the <code>h</code> matrix we have the association of these bird communities in each surveyed geographical grid.</p>
+</div>
+<div id="geographic-focus-on-nmf-factors" class="section level2">
+<h2>Geographic focus on NMF factors</h2>
+<p>What does each NMF factor tell us?</p>
+<p>The sample embeddings matrix (<code>h</code>) gives information about the geographical representation of each NMF factor across all grids. We’ll look at just the first four factors:</p>
+<pre class="r"><code>plots &lt;- list()
+for(i in 1:4){
+  df &lt;- data.frame(
+    &quot;lat&quot; = hawaiibirds$metadata_h$lat,
+    &quot;lng&quot; = hawaiibirds$metadata_h$lng,
+    &quot;nmf_factor&quot; = model$h[i, ])
+  plots[[i]] &lt;- ggplot(df, aes(x = lng, y = lat, color = nmf_factor)) +
+    geom_point() +
+    scale_color_viridis(option = &quot;B&quot;) +
+    theme_void() +
+    theme(legend.position = &quot;none&quot;, plot.title = element_text(hjust = 0.5)) + 
+    ggtitle(paste0(&quot;Factor &quot;, i))
+}
+plot_grid(plotlist = plots, nrow = 2)</code></pre>
+<p><img src="https://zachdebruine.com/post/annotating-nmf-factors-with-sample-metadata/index.en_files/figure-html/unnamed-chunk-9-1.png" width="384" style="display: block; margin: auto auto auto 0;" /></p>
+</div>
+<div id="metadata-enrichment-in-factors" class="section level2">
+<h2>Metadata enrichment in factors</h2>
+<p>Factor 2 is localized largely to the island of Hawaii, factor 3 to the island of Kauai, and factor 4 to Oahu.</p>
+<p>Quantitatively, the <code>summary</code> method for the <code>nmf</code> S3 class makes it easy to annotate factors using metadata about samples or features. See <code>?summary.nmf</code> for info.</p>
+<p>In this case, we will use <code>summary</code> to map factor enrichment in grids corresponding to each Hawaiian island, and species enrichment corresponding to each category.</p>
+<pre class="r"><code>plot(summary(model, group_by = hawaiibirds$metadata_h$island, stat = &quot;sum&quot;))</code></pre>
+<p><img src="https://zachdebruine.com/post/annotating-nmf-factors-with-sample-metadata/index.en_files/figure-html/unnamed-chunk-10-1.png" width="384" style="display: block; margin: auto auto auto 0;" /></p>
+<p>In general, grids separate based on the island to which they belong – consistent with the expectation that islands contain distinct species communities.</p>
+<p>Notice how several factors explain variation within the big island, “Hawaii”, consistent with the objective of NMF and the biological diversity within that island.</p>
+<p>Due to our normalization method (<code>sum</code>) very small islands with minor contribution to the model objective (i.e. Puuwai) are hardly represented.</p>
+<pre class="r"><code>plot(summary(model, group_by = hawaiibirds$metadata_w$category, stat = &quot;mean&quot;))</code></pre>
+<p><img src="https://zachdebruine.com/post/annotating-nmf-factors-with-sample-metadata/index.en_files/figure-html/unnamed-chunk-11-1.png" width="384" style="display: block; margin: auto auto auto 0;" /></p>
+<p>Clearly, there is the greatest signal complexity among “perching birds”. <code>nmf10</code> is describing “seabirds” while <code>nmf9</code> is capturing much of the “non-perching birds” information.</p>
+</div>
+<div id="nmf-biplots" class="section level2">
+<h2>NMF biplots</h2>
+<p>Compare species composition in two factors that are both primarily restricted to the island of Hawaii, factors 7 and 8. The <code>biplot</code> S3 method for <code>nmf</code> makes this easy:</p>
+<pre class="r"><code>biplot(model, factors = c(7, 8), matrix = &quot;w&quot;, group_by = hawaiibirds$metadata_w$category) + 
+  scale_y_continuous(trans = &quot;sqrt&quot;) + 
+  scale_x_continuous(trans = &quot;sqrt&quot;) +
+  geom_text_repel(size = 2.5, seed = 123, max.overlaps = 15)</code></pre>
+<p><img src="https://zachdebruine.com/post/annotating-nmf-factors-with-sample-metadata/index.en_files/figure-html/unnamed-chunk-12-1.png" width="528" style="display: block; margin: auto auto auto 0;" /></p>
+<p>Factor 7 describes a wet rainforest community while Factor 8 describes dry rainforest/shrubland communities. Both factors are overwhelmingly focused on “perching birds”.</p>
+</div>
+<div id="umap-on-nmf-embeddings" class="section level2">
+<h2>UMAP on NMF embeddings</h2>
+<p>We might also be interested in visualizing how factors in <span class="math inline">\(w\)</span> capture similarities among bird species using UMAP.</p>
+<pre class="r"><code>set.seed(123)
+umap &lt;- data.frame(uwot::umap(model$w))
+umap$taxon &lt;- hawaiibirds$metadata_w$category
+umap$status &lt;- hawaiibirds$metadata_w$status
+plot_grid(
+  ggplot(umap, aes(x = umap[,1], y = umap[,2], color = taxon)) +
+    geom_point() + theme_void(),
+  ggplot(umap, aes(x = umap[,1], y = umap[,2], color = status)) +
+    geom_point() + theme_void(),
+  nrow = 1
+)</code></pre>
+<p><img src="https://zachdebruine.com/post/annotating-nmf-factors-with-sample-metadata/index.en_files/figure-html/unnamed-chunk-13-1.png" width="768" style="display: block; margin: auto auto auto 0;" /></p>
+<p>Species are classified based on habitat niche and taxonomic membership. Notice “seabirds” on the left, “perching birds” in the center mixed with “non-perching birds”, and a mix of “waders”, “waterfowl”, and “shorebirds” in the bottom right. There are also two distinct groups of “shorebirds” and “waterfowl”, consistent with distinct inland and shoreline communities.</p>
+<p>Hawaii is extinction kingdom. For instance, more than 20 species of endemic honeycreeper have gone extinct in the past two centuries due to the establishment of introduced species and habitat devastation. Few remain. In the UMAP plot above on the right, we can observe that introduced species dominate habitat niches occupied by native perching and non-perching birds, a problem underlying historic and ongoing mass extinction events.</p>
+<pre class="r"><code>set.seed(123)
+umap &lt;- data.frame(uwot::umap(t(model$h)))
+umap$group &lt;- hawaiibirds$metadata_h$island
+ggplot(umap, aes(x = umap[,1], y = umap[,2], color = group)) +
+  geom_point() + theme_void()</code></pre>
+<p><img src="https://zachdebruine.com/post/annotating-nmf-factors-with-sample-metadata/index.en_files/figure-html/unnamed-chunk-14-1.png" width="384" style="display: block; margin: auto auto auto 0;" /></p>
+<p>Islands are also well-defined by the NMF model.</p>
+</div>
+<div id="defining-the-palila-species-niche" class="section level2">
+<h2>Defining the “Palila” species niche</h2>
+<p>The <a href="https://ebird.org/media/catalog?taxonCode=palila&amp;mediaType=p&amp;sort=rating_rank_desc&amp;q=Palila%20-%20Loxioides%20bailleui">Palila</a> is a highly endangered species that survives in small numbers on the eastern slopes of Mauna Kea on the dry island, in a shrubby dry “rainforest” biome. This biome is unique on the island of Hawaii.</p>
+<p>What species coexist with the Palila?</p>
+<p>Let’s find the highest factorization resolution at which a single factor describes the distribution of the Palila.</p>
+<pre class="r"><code>palila &lt;- list()
+for(rank in 1:20)
+  palila[[rank]] &lt;- data.frame(
+    &quot;value&quot; = nmf(hawaiibirds$counts, k = rank, seed = 123, v = F)$w[&quot;Palila&quot;, ],
+    &quot;rank&quot; = rep(rank, rank)
+  )
+palila &lt;- do.call(rbind, palila)
+ggplot(palila, aes(x = rank, y = value, color = factor(rank))) + geom_jitter(width = 0.1) + theme_classic() +
+  scale_color_manual(values = rep(c(&quot;#F8766D&quot;, &quot;#00BDD0&quot;), 10)) + labs(&quot;Palila loading in factor&quot;) + theme(legend.position = &quot;none&quot;)</code></pre>
+<p><img src="https://zachdebruine.com/post/annotating-nmf-factors-with-sample-metadata/index.en_files/figure-html/unnamed-chunk-15-1.png" width="384" style="display: block; margin: auto auto auto 0;" /></p>
+<p>The model with a rank of 15 contains a factor in which the Palila is both important and specific.</p>
+<p>Let’s have a look at the species composition in factor 15, specifically identifying which species are introduced and which are native:</p>
+<pre class="r"><code>model &lt;- nmf(hawaiibirds$counts, k = 15, seed = 123, v = F)
+df &lt;- data.frame(&quot;value&quot; = model$w[, which.max(model$w[&quot;Palila&quot;, ])])
+df$status &lt;- hawaiibirds$metadata_w$status
+df &lt;- df[order(-df$value), ]
+df &lt;- df[df$value &gt; 0.001, ]
+df</code></pre>
+<pre><code>##                             value     status
+## Hawaii Amakihi        0.353110902     native
+## Warbling White-eye    0.188662129     native
+## House Finch           0.182132197 introduced
+## Erckel&#39;s Francolin    0.066866618 introduced
+## Yellow-fronted Canary 0.045745828 introduced
+## California Quail      0.043372489     native
+## Palila                0.038791926     native
+## Eurasian Skylark      0.032193106 introduced
+## Hawaii Elepaio        0.028948444     native
+## Red-billed Leiothrix  0.008899639 introduced
+## Chukar                0.004825709 introduced
+## Indian Peafowl        0.003265103     native
+## Chinese Hwamei        0.002520935 introduced</code></pre>
+<p>The diet of the Palilla is largely seeds from the “mamame” tree, but also naio berries and mamame flowers, buds, and young leaves. What introduced perching birds may be competing with the Palila for these resources?</p>
+<pre class="r"><code>perching_birds &lt;- hawaiibirds$metadata_w$species[hawaiibirds$metadata_w$category == &quot;perching birds&quot;]
+df[which(rownames(df) %in% perching_birds &amp; df$status == &quot;introduced&quot;), ]</code></pre>
+<pre><code>##                             value     status
+## House Finch           0.182132197 introduced
+## Yellow-fronted Canary 0.045745828 introduced
+## Eurasian Skylark      0.032193106 introduced
+## Red-billed Leiothrix  0.008899639 introduced
+## Chinese Hwamei        0.002520935 introduced</code></pre>
+<p>The “House Finch” and “Yellow-fronted Canary” seem to be the most significant competitors in the Palila habitat niche.</p>
+</div>
+
+    </div>
+
+    
+
+
+
+
+
+
+<div class="article-tags">
+  
+  <a class="badge badge-light" href="/tag/nmf/">NMF</a>
+  
+  <a class="badge badge-light" href="/tag/annotation/">annotation</a>
+  
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+
+
+
+  
+  
+  
+    
+  
+  
+  
+  <div class="media author-card content-widget-hr">
+    
+      
+      <a href="https://zachdebruine.com/"><img class="avatar mr-3 avatar-circle" src="/author/zach-debruine/avatar_hufe5cf19ab3862ec1ff7e31e2bfb05ae9_344625_270x270_fill_q75_lanczos_center.jpg" alt="Zach DeBruine"></a>
+    
+
+    <div class="media-body">
+      <h5 class="card-title"><a href="https://zachdebruine.com/">Zach DeBruine</a></h5>
+      <h6 class="card-subtitle">Postdoctoral Fellow in Bioinformatics</h6>
+      <p class="card-text">Postdoctoral fellow in bioinformatics interested in single-cell experiments and dimensional reduction. I love simple, fast, and common sense data analysis.</p>
+      <ul class="network-icon" aria-hidden="true">
+  
+    
+    
+    
+      
+    
+    
+    
+    
+    
+    <li>
+      <a href="mailto::zacharydebruine@gmail.com" >
+        <i class="fas fa-envelope"></i>
+      </a>
+    </li>
+  
+    
+    
+    
+      
+    
+    
+    
+    
+    
+      
+    
+    <li>
+      <a href="/" >
+        <i class="fas fa-"></i>
+      </a>
+    </li>
+  
+    
+    
+    
+    
+    
+    
+    
+      
+    
+    <li>
+      <a href="https://scholar.google.com/citations?user=l9qurb4AAAAJ" target="_blank" rel="noopener">
+        <i class="ai ai-google-scholar"></i>
+      </a>
+    </li>
+  
+    
+    
+    
+      
+    
+    
+    
+    
+    
+      
+    
+    <li>
+      <a href="https://github.com/zdebruine" target="_blank" rel="noopener">
+        <i class="fab fa-github"></i>
+      </a>
+    </li>
+  
+    
+    
+    
+      
+    
+    
+    
+    
+    
+      
+    
+    <li>
+      <a href="https://www.linkedin.com/in/zacharydebruine/" target="_blank" rel="noopener">
+        <i class="fab fa-linkedin"></i>
+      </a>
+    </li>
+  
+    
+    
+    
+    
+    
+    
+    
+      
+    
+    <li>
+      <a href="https://orcid.org/0000-0003-2234-4827/" target="_blank" rel="noopener">
+        <i class="ai ai-orcid"></i>
+      </a>
+    </li>
+  
+    
+    
+    
+      
+    
+    
+    
+    
+    
+      
+    
+    <li>
+      <a href="https://stackoverflow.com/users/1436247/zdebruine/" target="_blank" rel="noopener">
+        <i class="fab fa-stack-overflow"></i>
+      </a>
+    </li>
+  
+</ul>
+
+    </div>
+  </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+</article>
+  </div>
+
+  <div class="page-footer">
+    
+    
+    <div class="container">
+      
+
+    <script src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS_HTML"></script>
+    
+    <script type="text/x-mathjax-config">
+    MathJax.Hub.Config({
+        tex2jax: {
+            inlineMath: [ ['$','$'], ["\\(","\\)"] ],
+            displayMath: [ ['$$','$$'], ["\\[","\\]"] ],
+            processEscapes: true,
+            processEnvironments: true
+        },
+        // Center justify equations in code and markdown cells. Elsewhere
+        // we use CSS to left justify single line equations in code cells.
+        displayAlign: 'center',
+        "HTML-CSS": {
+            styles: {'.MathJax_Display': {"margin": 0}},
+            linebreaks: { automatic: true }
+        }
+    });
+    </script>
+    
+    </div>
+    
+  </div>
+
+  
+<div id="modal" class="modal fade" role="dialog">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Cite</h5>
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body">
+        <pre><code class="tex hljs"></code></pre>
+      </div>
+      <div class="modal-footer">
+        <a class="btn btn-outline-primary my-1 js-copy-cite" href="#" target="_blank">
+          <i class="fas fa-copy"></i> Copy
+        </a>
+        <a class="btn btn-outline-primary my-1 js-download-cite" href="#" target="_blank">
+          <i class="fas fa-download"></i> Download
+        </a>
+        <div id="modal-error"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+      
+
+    
+    <script src="/js/vendor-bundle.min.b73dfaac3b6499dc997741748a7c3fe2.js"></script>
+
+    
+    
+    
+      
+      
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.imagesloaded/4.1.4/imagesloaded.pkgd.min.js" integrity="sha256-lqvxZrPLtfffUl2G/e7szqSvPBILGbwmsGE1MKlOi0Q=" crossorigin="anonymous"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.isotope/3.0.6/isotope.pkgd.min.js" integrity="sha256-CBrpuqrMhXwcLLUd5tvQ4euBHCdh7wGlDfNz8vbu/iI=" crossorigin="anonymous"></script>
+      
+
+      
+      
+
+      
+
+      
+        
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.2.0/highlight.min.js" integrity="sha512-TDKKr+IvoqZnPzc3l35hdjpHD0m+b2EC2SrLEgKDRWpxf2rFCxemkgvJ5kfU48ip+Y+m2XVKyOCD85ybtlZDmw==" crossorigin="anonymous"></script>
+        
+        
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.2.0/languages/r.min.js" crossorigin="anonymous"></script>
+        
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.2.0/languages/python.min.js" crossorigin="anonymous"></script>
+        
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.2.0/languages/latex.min.js" crossorigin="anonymous"></script>
+        
+      
+
+    
+
+    
+    
+    
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/leaflet.min.js" integrity="sha512-SeiQaaDh73yrb56sTW/RgVdi/mMqNeM2oBwubFHagc5BkixSpP1fvqF47mKzPGWYSSy4RwbBunrJBQ4Co8fRWA==" crossorigin="anonymous"></script>
+    
+
+    
+    
+
+    
+    
+    
+      
+      <script id="search-hit-fuse-template" type="text/x-template">
+        <div class="search-hit" id="summary-{{key}}">
+          <div class="search-hit-content">
+            <div class="search-hit-name">
+              <a href="{{relpermalink}}">{{title}}</a>
+              <div class="article-metadata search-hit-type">{{type}}</div>
+              <p class="search-hit-description">{{snippet}}</p>
+            </div>
+          </div>
+        </div>
+      </script>
+      
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/fuse.js/3.2.1/fuse.min.js" integrity="sha256-VzgmKYmhsGNNN4Ph1kMW+BjoYJM2jV5i4IlFoeZA9XI=" crossorigin="anonymous"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/mark.js/8.11.1/jquery.mark.min.js" integrity="sha256-4HLtjeVgH0eIB3aZ9mLYF6E8oU5chNdjU6p6rrXpl9U=" crossorigin="anonymous"></script>
+      
+    
+
+    
+    
+
+    
+    
+    
+    
+
+    
+    
+      
+      
+      
+      
+      
+      
+      
+    
+
+    
+    
+    
+    
+    
+    
+    
+    
+      
+      
+    
+    
+    <script src="/en/js/wowchemy.min.d68ecd57c0ec1f1f61d65fd568f1c3a0.js"></script>
+
+    
+  <script async defer src="https://buttons.github.io/buttons.js"></script>
+
+
+
+
+</body>
+</html>

@@ -1,0 +1,168 @@
+---
+title: "Linked NMF for Signal Source Separation"
+author: "Zach DeBruine"
+date: '2021-10-25'
+slug: linked-nmf-for-signal-source-separation
+categories:
+- NMF
+- methods
+tags:
+- NMF
+- integration
+- linked-NMF
+subtitle: Learning shared and unique feature models across sample sets with implicitly
+  linked factorizations
+summary: Non-negative matrix factorization is a useful method for additive decomposition
+  of signal within a dataset. However, NMF of concatenated datasets does not cleanly
+  resolve batch effects, sources of heterogeneity, and common signal. Linked NMF implicitly
+  couples independent factorizations of multiple datasets to recover models describing
+  shared and unique signal.
+lastmod: '2021-10-25T16:11:14-04:00'
+featured: no
+image:
+  caption: ''
+  focal_point: ''
+  preview_only: yes
+---
+
+
+
+<div id="nmf-problem-definition" class="section level1">
+<h1>NMF problem definition</h1>
+<div id="basic-nmf" class="section level2">
+<h2>Basic NMF</h2>
+<p>Non-negative matrix factorization (NMF) enforces non-negativity in place of orthogonality to learn an additive, low-rank representation of some non-negative matrix <span class="math inline">\(A_{N \times M}\)</span> in terms of the Frobenius norm:</p>
+<p><span class="math display">\[\tag{1} \min_{\{W, H\} \geq0} \lVert A - WH \rVert_F^2\]</span></p>
+<p>where <span class="math inline">\((W)_{N \times k}(H)_{k \times M}\)</span> of rank <span class="math inline">\(k\)</span> produce a lower-rank approximation of <span class="math inline">\(A\)</span>.</p>
+<p>Generally, <span class="math inline">\(W\)</span> is randomly initialized and <span class="math inline">\(H\)</span> and then <span class="math inline">\(W\)</span> are alternately updated until some stopping criteria is satisfied, such as a maximum number of iterations or a measure of convergence.</p>
+</div>
+<div id="joint-nmf-jnmf" class="section level2">
+<h2>Joint NMF (jNMF)</h2>
+<p>Joint NMF integrates multiple datasets with a common set of observations. For <em>K</em> data matrices <span class="math inline">\((A_1)_{N \times M_1}, ...,(A_K)_{N \times M_K}\)</span>, the objective is:</p>
+<p><span class="math display">\[\tag{2}\min_{\{W, H\} \geq0} \sum_{k=1}^K\lVert A_k - WH_k \rVert_F^2\]</span></p>
+<p>Notice that eqn. 2 on separate datasets is equivalent to eqn. 1 on a combined dataset since each dataset contributes to the loss function equally.</p>
+<p>jNMF cannot separate shared and unique signals between datasets because there is only one <span class="math inline">\(W\)</span> matrix mapped to each dataset <span class="math inline">\(A_k\)</span> by a single <span class="math inline">\(H_k\)</span> matrix.</p>
+</div>
+<div id="integrative-nmf-inmf" class="section level2">
+<h2>Integrative NMF (iNMF)</h2>
+<p>Integrative NMF, proposed by <a href="https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5006236/pdf/btv544.pdf">Yang and Michailidis</a>, can resolve shared and unique signals between datasets, subject to linear and additive correspondences between these signals.</p>
+<p>iNMF considers shared signals in <span class="math inline">\(WH_k\)</span> and unique signals in <span class="math inline">\(U_kH_k\)</span>. The following is a perspective on iNMF:</p>
+<p><span class="math display">\[\tag{3} \min_{\{W, H, U\} \geq 0} \sum_{k = 1}^K{\left\Vert A_k - (W + \lambda U_k)H_k] \right\Vert _F^2}\]</span></p>
+<p>To retain identifiability of shared signals, the contribution of unique signals (<span class="math inline">\(U_kH_k\)</span>) to the model of shared signals (<span class="math inline">\(WH_k\)</span>) is weighted by <span class="math inline">\(\lambda\)</span>.</p>
+<p>iNMF assumes direct correspondence between shared and unique effects because <span class="math inline">\(W\)</span> and <span class="math inline">\(U_k\)</span> are added and mapped to <span class="math inline">\(A_k\)</span> by the same weights in <span class="math inline">\(H_k\)</span>. Thus, <span class="math inline">\(W\)</span> gives the minimum additive basis of shared signal in <span class="math inline">\(A_{1...K}\)</span> while <span class="math inline">\(U_{1...K}\)</span> gives additional unique signal, and thus each factor in <span class="math inline">\(W\)</span> and <span class="math inline">\(U_k\)</span> contain linearly coordinated information.</p>
+<p>This can be a limitation, for example, in separation of male- and female-specific gene expression where <span class="math inline">\(W\)</span> should describe non-specific processes and <span class="math inline">\(U_{male}\)</span> or <span class="math inline">\(U_{female}\)</span> should describe sex-specific processes, in which case iNMF would improperly assume linear coordination and additivity between sex-specific and non-specific processes.</p>
+</div>
+<div id="linked-nmf-lnmf" class="section level2">
+<h2>Linked NMF (lNMF)</h2>
+<p><span class="math inline">\(U_k\)</span> may be uncoupled from <span class="math inline">\(W\)</span> by introducing a unique mapping matrix for unique signal, <span class="math inline">\(V_k\)</span>. This approach relaxes the assumptions of linear and additive correspondence between <span class="math inline">\(W\)</span> and <span class="math inline">\(U_k\)</span> in iNMF.</p>
+<p>The result is that each dataset is described by unique effects in <span class="math inline">\(U_kV_k\)</span> and shared effects in <span class="math inline">\(WH_k\)</span>, such that <span class="math inline">\(A_k \approx WH_k + U_kV_k\)</span>. In other words, unique factorizations are “linked” by the shared model, <span class="math inline">\(W\)</span>.</p>
+<p>A useful perspective of such “linked NMF” (lNMF) is the following:</p>
+<p><span class="math display">\[\tag{4} \min_{\{W, H, U, V\} \geq 0} \sum_{k = 1}^K{\left\Vert A_k - \begin{pmatrix} W &amp; U_k\end{pmatrix} \begin{pmatrix} H_k \\\ V_k\end{pmatrix} \right\Vert _F^2}\]</span></p>
+<p>In lNMF, factors in the unique signal model (<span class="math inline">\(U_k\)</span>) need not coordinate with factors in the shared signal model (<span class="math inline">\(W\)</span>). Furthermore, the complexity of <span class="math inline">\(U_k\)</span> may differ from <span class="math inline">\(W\)</span> because rank may be varied.</p>
+<p>In principle, lNMF is an extension of jNMF in which unique factors in <span class="math inline">\(U\)</span> (mapped by <span class="math inline">\(V\)</span>) are concatenated to shared factors in <span class="math inline">\(W\)</span> (mapped by <span class="math inline">\(H\)</span>).</p>
+<p>Unlike in iNMF, there is no need for a weighting parameter (<span class="math inline">\(\lambda\)</span>) to retain identifiability because <span class="math inline">\(W\)</span> and <span class="math inline">\(U_k\)</span> are mapped jointly, and the relative ranks of <span class="math inline">\(U_k\)</span> and <span class="math inline">\(W\)</span> control the resolution of unique and shared signals.</p>
+<p>The following perspective of lNMF illustrates the separability of the two linked matrix factorization subproblems:</p>
+<p><span class="math display">\[\tag{5} \min_{\{W, H, U, V\} \geq 0} \sum_{k = 1}^K{\left\Vert A_k - (WH_k + U_kV_k) \right\Vert_F^2}\]</span></p>
+<p>A separation of the two objectives in this expression makes clear that linked NMF implicitly links two factorization problems:</p>
+<p><span class="math display">\[\tag{5} \min_{\{W, H, U, V\} \geq 0} \sum_{k = 1}^K{\left\Vert A_k - WH_k \right\Vert _F^2} + \sum_{k = 1}^K{\left\Vert A_k - U_kV_k\right\Vert_F^2}\]</span></p>
+<p>Obviously the models must be jointly considered during each update, and thus the above perspective is not particularly useful for deriving solutions.</p>
+</div>
+<div id="linked-nmf-in-transfer-learning" class="section level2">
+<h2>Linked NMF in Transfer Learning</h2>
+<p>Transfer learning (TL) by linear model projection minimizes the expression:</p>
+<p><span class="math display">\[\tag{6} \min_{H_0\geq0} \lVert A_0 - WH_0 \rVert_F^2 \]</span></p>
+<p>In the above expression, <span class="math inline">\(W\)</span> has been trained on some data <span class="math inline">\(A\)</span> and is now being projected onto some new data <span class="math inline">\(A_0\)</span> to find <span class="math inline">\(H_0\)</span>. In other words, <span class="math inline">\(H_0\)</span> is the mapping matrix for <span class="math inline">\(W\)</span> onto <span class="math inline">\(A_0\)</span>.</p>
+<p>However, this objective does not alternately refine <span class="math inline">\(W\)</span> and <span class="math inline">\(H_0\)</span>, and thus the minimization of the objective is entirely dependent on how well the available information in <span class="math inline">\(W\)</span> explains the information in <span class="math inline">\(A_0\)</span>. Thus, if <span class="math inline">\(A\)</span> and <span class="math inline">\(A_0\)</span> contain non-overlapping signal, <span class="math inline">\(W\)</span> cannot ideally minimize the TL objective.</p>
+<p>Most transfer learning projections are degenerate, because <span class="math inline">\(W\)</span> is not an exhaustive dictionary of all signal that may possibly be encountered in <span class="math inline">\(A_0\)</span>. The mapping in <span class="math inline">\(H_0\)</span> involves sub-optimal and possibly entirely incorrect mapping, which may mislead interpretation of the results.</p>
+<p>As a solution to this problem, consider a linked TL objective:</p>
+<p><span class="math display">\[\tag{7} \min_{H_0,U,V\geq0} \left\lVert A_0 - \begin{pmatrix} W &amp; U\end{pmatrix}\begin{pmatrix} H_0 \\\ V\end{pmatrix}\right\rVert_F^2\]</span></p>
+<p>Here, TL involves projection of <span class="math inline">\(W\)</span> onto new data <span class="math inline">\(A_0\)</span> to find <span class="math inline">\(H_0\)</span> alongside additional factors in <span class="math inline">\(UV\)</span> that explain additional signal in <span class="math inline">\(A_0\)</span> not in <span class="math inline">\(A\)</span>.</p>
+<p>The rank of <span class="math inline">\(U\)</span> must be decided based on a tradeoff point that balances error of the model against mapping preference for <span class="math inline">\(W\)</span> over <span class="math inline">\(U\)</span>.</p>
+</div>
+</div>
+<div id="solving-nmf-problems" class="section level1">
+<h1>Solving NMF problems</h1>
+<p>NMF is commonly solved using multiplicative updates, as proposed by Seung and Lee, or some type of block-coordinate pivoting method, such as alternating least squares (ALS) updates. ALS, subject to non-negativity constraints, has become popular due to its definite convergence guarantee and performance.</p>
+<div id="solving-nmf-with-alternating-least-squares" class="section level2">
+<h2>Solving NMF with Alternating Least Squares</h2>
+<p>To solve the NMF problem in eqn. 1, <span class="math inline">\(W\)</span> is randomly initialized, and <span class="math inline">\(H\)</span> and then <span class="math inline">\(W\)</span> are alternately updated until some stopping criteria is satisfied. The alternating updates are column-wise in <span class="math inline">\(H\)</span> and row-wise in <span class="math inline">\(W\)</span>:</p>
+<p><span class="math display">\[\tag{8}H_{:i} \leftarrow \min_{H_{:i} \geq0} \lVert A_{:i} - WH_{:i} \rVert_F^2\]</span></p>
+<p><span class="math display">\[\tag{9}W^T_{:j} \leftarrow \min_{W^T_{:j} \geq 0} \lVert A^T_{:j} - H^TW_{:j}^T \rVert_F^2\]</span>
+<span class="math display">\[ \forall ij, \;where \; 1 \leq i \leq N, 1 \leq j \leq M \]</span></p>
+<p>One way to minimize this expression with non-negative least squares (NNLS) is to find an equivalent form as <span class="math inline">\(ax = b\)</span>, derived from eqn. 8, where <span class="math inline">\(a\)</span> is symmetric positive definite:</p>
+<p><span class="math display">\[\tag{10}W^TWH_{:i} = W^TA_{:i} \;\;\;\; \forall i,\;1 \leq i \leq N\]</span></p>
+<p>where <span class="math inline">\(a = W^TW\)</span>, <span class="math inline">\(x = H_{:i}\)</span>, and <span class="math inline">\(b = W^TA_{:i}\)</span>. <span class="math inline">\(W^TW\)</span> is constant for all columns in <span class="math inline">\(H\)</span>, thus the calculation of <span class="math inline">\(W^TA_{:i}\)</span> and NNLS solving may be massively parallelized.</p>
+<p>The corresponding form for eqn. 7 is:
+<span class="math display">\[\tag{11}HH^TW^T_{:j} = HA^T_{:j} \;\;\;\; \forall j,\;1 \leq j \leq M\]</span></p>
+<p>Algorithms for solving non-negative least squares (NNLS) are not discussed here.</p>
+</div>
+<div id="solving-lnmf-problems" class="section level2">
+<h2>Solving lNMF problems</h2>
+<p>In lNMF, shared and unique signals must be jointly resolved according to eqn. 4. Thus, each alternating update in lNMF consists of two minimization problems, one which is unique for each dataset <span class="math inline">\(A_k\)</span> (i.e. the updates of <span class="math inline">\(H_k\)</span>, <span class="math inline">\(U_k\)</span>, and <span class="math inline">\(V_k\)</span>), and one which is linked across all datasets <span class="math inline">\(A_{1...K}\)</span> (i.e. the update of <span class="math inline">\(W\)</span>), where each problem must account for the current solution of the other.</p>
+<p>Prior to updating, randomly initialize <span class="math inline">\(W\)</span>, <span class="math inline">\(U_{1...K}\)</span>, and <span class="math inline">\(V_{1...K}\)</span>. <span class="math inline">\(H_{1...K}\)</span> may be uninitialized since they will be updated first.</p>
+<div id="unique-updates" class="section level3">
+<h3>Unique Updates</h3>
+<p>Solve the unique minimization problem in eqn. 4 to update <span class="math inline">\(H_k\)</span>, <span class="math inline">\(V_k\)</span>, and <span class="math inline">\(U_k\)</span>.</p>
+<p>The update for <span class="math inline">\(H_k\)</span> and <span class="math inline">\(V_k\)</span> as one unit, corresponding to eqn. 10, is the following:</p>
+<p><span class="math display">\[\tag{12}\begin{pmatrix} W^T \\\ U^T_k\end{pmatrix}\begin{pmatrix} W &amp; U_k\end{pmatrix}\begin{pmatrix} H_{k_{:i}} \\\ V_{k_{:i}}\end{pmatrix} = \begin{pmatrix} W^T \\\ U^T_k\end{pmatrix}A_{:i} \;\;\;\; \forall i,\;1 \leq i \leq N_k\]</span></p>
+<p>where <span class="math inline">\(W\)</span>, <span class="math inline">\(U_k\)</span>, and <span class="math inline">\(A\)</span> are fixed. Let <span class="math inline">\(Y_k = \begin{pmatrix} W &amp; U_k\end{pmatrix}\)</span>, then realize that <span class="math inline">\(a = Y^TY\)</span>, <span class="math inline">\(b = Y^TA_{:i}\)</span> and <span class="math inline">\(x = \begin{pmatrix} H_{k_{:i}} \\\ V_{k_{:i}}\end{pmatrix}\)</span>. Note that <span class="math inline">\(H_k\)</span> and <span class="math inline">\(V_k\)</span> are resolved simultaneously.</p>
+<p>The corresponding update for <span class="math inline">\(U_k\)</span>, corresponding to eqn. 9, is the following:</p>
+<p><span class="math display">\[\tag{13}\begin{pmatrix} H_k \\\ V_k\end{pmatrix}\begin{pmatrix} H^T_k &amp; V^T_k\end{pmatrix}\begin{pmatrix} W^T_{:j} \\\ U^T_{k_{:j}}\end{pmatrix} = \begin{pmatrix} H_k \\\ V_k\end{pmatrix}A^T_{:j} \;\;\;\; \forall j,\;1 \leq j \leq M\]</span></p>
+<p>where <span class="math inline">\(W\)</span>, <span class="math inline">\(A\)</span>, <span class="math inline">\(H_k\)</span>, and <span class="math inline">\(V_k\)</span> are fixed. Let <span class="math inline">\(Z = \begin{pmatrix} H_k \\\ V_k\end{pmatrix}\)</span>, then realize that <span class="math inline">\(a = ZZ^T\)</span>, <span class="math inline">\(b = ZA^T_{:j}\)</span>, and <span class="math inline">\(x = \begin{pmatrix} W^T_{:j} \\\ U^T_{k_{:j}}\end{pmatrix}\)</span>.</p>
+<p>In eqn. 13, <span class="math inline">\(x\)</span> is partially fixed in <span class="math inline">\(W^T_{:j}\)</span>. It is important to hold <span class="math inline">\(W^T_{:j}\)</span> constant in this case, and not to even partially update it, since the contributions of <span class="math inline">\(H_{1...K \notin k}\)</span> would confound the update. The update of <span class="math inline">\(W^T_{:j}\)</span> is thus necessarily “linked” across all datasets <span class="math inline">\(A_{1...K}\)</span>.</p>
+</div>
+<div id="linked-updates" class="section level3">
+<h3>Linked Updates</h3>
+<p>Update <span class="math inline">\(W\)</span> by minimizing the loss of the linked factorizations while holding <span class="math inline">\(U\)</span>, <span class="math inline">\(V\)</span>, and <span class="math inline">\(H\)</span> constant for all datasets <span class="math inline">\(A_{1...K}\)</span>:</p>
+<p><span class="math display">\[\tag{14} \min_{W \geq 0} \left\Vert \begin{pmatrix} A^T_1 \\\ \vdots \\\ A^T_K\end{pmatrix} - \begin{pmatrix}H_1^T &amp; V^T_1 &amp; 0 &amp; 0 \\\ \vdots &amp; 0 &amp; \ddots &amp; 0 \\\ H^T_K &amp; 0 &amp; 0 &amp; V^T_K \end{pmatrix} \begin{pmatrix} W^T \\\ U^T_1 \\\ \vdots \\\ U^T_K\end{pmatrix} \right\Vert _F^2\]</span></p>
+<p>For brevity, consider eqn. 14 to be in the form:</p>
+<p><span class="math display">\[ \tag{15} \min_{W \geq 0} \left\lVert  A^T - \begin{pmatrix} H^T &amp; tr(V_{1...K}^T) \end{pmatrix} \begin{pmatrix} W^T \\\ U^T \end{pmatrix} \right\rVert_F^2\]</span>
+where <span class="math inline">\(tr(V_{1...K}^T)\)</span> is the diagonal matrix spelled out in eqn. 14 and <span class="math inline">\(H^T\)</span> and <span class="math inline">\(U^T\)</span> are marginal concatenations of <span class="math inline">\(H_{1...K}\)</span> and <span class="math inline">\(U_{1...K}\)</span>.</p>
+<p>Let <span class="math inline">\(X = \begin{pmatrix} H^T &amp; tr(V_{1...K}^T) \end{pmatrix}\)</span>, the update of <span class="math inline">\(W\)</span> corresponding to eqn. 11 is thus:</p>
+<p><span class="math display">\[\tag{16} XX^T \begin{pmatrix} W^T_{:j} \\\ U^T_{:j}\end{pmatrix} = XA^T_{:j} \;\;\;\; \forall j, \;1 \leq j \leq M\]</span></p>
+<p>where <span class="math inline">\(U_{:j}^T\)</span> is fixed, similarly to what was the case for <span class="math inline">\(W_{:j}^T\)</span> in eqn. 13. Realize that <span class="math inline">\(a = XX^T\)</span>, <span class="math inline">\(b = XA^T_{:j}\)</span>, and <span class="math inline">\(x = \begin{pmatrix} W^T_{:j} \\\ U^T_{:j}\end{pmatrix}\)</span>.</p>
+</div>
+<div id="adapting-canonical-nmf-updating-algorithms-for-lnmf" class="section level3">
+<h3>Adapting canonical NMF updating algorithms for lNMF</h3>
+<p>A much simpler approach for updating <span class="math inline">\(WU\)</span> and <span class="math inline">\(HV\)</span>, which comes with very little computational penalty, is to consider linked NMF as an <span class="math inline">\(A = WH\)</span> factorization problem, where <span class="math inline">\(W = \begin{pmatrix} W &amp; U_1 &amp; \cdots &amp; U_K \end{pmatrix}\)</span> and <span class="math inline">\(H = X\)</span>, in which zeros in <span class="math inline">\(H\)</span> are maintained with each update. Thus, initial <span class="math inline">\(W\)</span> gives a random initialization while initial <span class="math inline">\(H\)</span> gives the linking matrix. With each update of <span class="math inline">\(H\)</span>, <span class="math inline">\(b\)</span> is only computed from rows in <span class="math inline">\(W^T\)</span> that are non-zero in rows of <span class="math inline">\(H_i\)</span>.</p>
+<p>This approach is implemented in RcppML, and comes with very little computational penalty despite the much more elegant updating procedure.</p>
+</div>
+<div id="determination-of-ranks" class="section level3">
+<h3>Determination of Ranks</h3>
+<p>In lNMF, the shared signal factorization <span class="math inline">\(WH_{1...K}\)</span> is of a certain rank, while each unique signal factorization <span class="math inline">\(U_kV_k\)</span> is of a different rank. Each rank is necessarily at least 1. The true difficulty of the rank determination problem thus scales exponentially with the number of datasets, <span class="math inline">\(K\)</span>.</p>
+<p>As a near-exact (and incredibly expensive) approach to the problem of rank-determination, suppose all datasets are factorized jointly (jNMF) at a rank that minimizes some cross-validation objective. This gives the largest possible rank (<span class="math inline">\(D_0\)</span>) for <span class="math inline">\(WH_{1...K}\)</span> in a linked factorization, if all signal were shared. Now suppose all datasets are factorized individually (NMF) at a rank that minimizes some cross-validation objective. This gives the largest possible rank (<span class="math inline">\(D_{1...K}\)</span>) for <span class="math inline">\(U_kV_k\)</span> in a linked factorization, if all signal were unique. Evidently, these ranks form the outer boundaries of possible scenarios, since if any signal is shared between datasets, these ranks will be overestimates. Thus, a theoretically exact method for determining optimal ranks would involve an iterative rank-downdating procedure involving alternate rank-reduction of <span class="math inline">\(WH\)</span> followed by each of the <span class="math inline">\(U_kV_k\)</span> models to points each that minimizes some cross-validation objective.</p>
+<p>As an approximate (and generally satisfactory) approach to the problem of rank-determination, suppose all datasets (<span class="math inline">\(A_{1...K}\)</span>) are factorized independently (NMF) to a rank (<span class="math inline">\(D_K\)</span>) that minimizes some cross-validation objective. Now let the rank of the <span class="math inline">\(WH_{1...K}\)</span> model in lNMF be set to the number of factors conserved across all independent factorizations (<span class="math inline">\(D_0\)</span>) as determined by some similarity heuristic. Let the rank of each <span class="math inline">\(U_kV_k\)</span> model be set to <span class="math inline">\(D_k - D_0\)</span>, and at least 1. This approach requires only a single lNMF run, and is reasonably approximate.</p>
+</div>
+</div>
+<div id="extending-lnmf" class="section level2">
+<h2>Extending lNMF</h2>
+<p>Because lNMF relies on updates by alternating least squares, it can take advantage of functionality supported by basic NMF algorithms. This includes massive parallelization, masking, L1/L2 regularization, and diagonalization.</p>
+</div>
+</div>
+<div id="linked-nmf-implementation" class="section level1">
+<h1>Linked NMF implementation</h1>
+<p>Linked NMF is implemented in the Rcpp Machine Learning Library (RcppML) R package, version 0.5.2 or greater.</p>
+<pre class="r"><code># devtools::install_github(&quot;zdebruine/RcppML&quot;)
+library(RcppML)</code></pre>
+<p>The <code>RcppML::lnmf</code> function takes a list of datasets, a rank for the shared matrix (<code>k_wh</code>), ranks for each of the unique matrix (<code>k_uv</code>), and parameters also used in the <code>nmf</code> implementation.</p>
+<p>The example below uses the <code>aml</code> dataset to find common signal between AML and reference cell methylation signatures.</p>
+<pre class="r"><code>data &lt;- list(
+  aml[, which(colnames(aml) == &quot;AML sample&quot;)],
+  aml[, which(colnames(aml) != &quot;AML sample&quot;)]
+)
+
+lnmf_model &lt;- lnmf(data, k_wh = 3, k_uv = c(2, 2))</code></pre>
+<p>Convert the <code>lnmf</code> model to an <code>nmf</code> model and plot factor representation in each sample grouping:</p>
+<pre class="r"><code>nmf_model &lt;- as(lnmf_model, &quot;nmf&quot;)
+
+library(ggplot2)
+plot(summary(nmf_model, 
+             group_by = colnames(aml), 
+             stat = &quot;mean&quot;))</code></pre>
+<p><img src="{{< blogdown/postref >}}index.en_files/figure-html/unnamed-chunk-3-1.png" width="288" style="display: block; margin: auto auto auto 0;" /></p>
+<p>As expected, lNMF has generated 3 factors describing shared signal (h1-3), two factors describing signal specific to AML samples (v1.1-2), and two factors describing signal specific to reference cell types (v2.1-2). In this case, these results are useful in classifying AML samples based on from which of the three reference cell types they likely originate.</p>
+</div>
+<div id="references" class="section level1">
+<h1>References</h1>
+<p>Material in this markdown was heavily inspired by work from <a href="https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5006236/pdf/btv544.pdf">Yang and Michailidis</a> and the <a href="https://www.cell.com/cell/pdf/S0092-8674(19)30504-5.pdf">Welch lab</a>. NMF code for demonstration purposes is derived from the RcppML package and the NMF implementation described in <a href="https://www.biorxiv.org/content/10.1101/2021.09.01.458620v1?rss=1">DeBruine et al. 2021</a>.</p>
+</div>

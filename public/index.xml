@@ -1,0 +1,813 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Zach DeBruine</title>
+    <link>https://zachdebruine.com/</link>
+      <atom:link href="https://zachdebruine.com/index.xml" rel="self" type="application/rss+xml" />
+    <description>Zach DeBruine</description>
+    <generator>Wowchemy (https://wowchemy.com)</generator><language>en-us</language><copyright>© 2021 Zach DeBruine</copyright><lastBuildDate>Wed, 20 Oct 2021 00:00:00 +0000</lastBuildDate>
+    <image>
+      <url>https://zachdebruine.com/media/icon_hu3a1a9d362c9f3f4d7273828c49d8e14c_75812_512x512_fill_lanczos_center_3.png</url>
+      <title>Zach DeBruine</title>
+      <link>https://zachdebruine.com/</link>
+    </image>
+    
+    <item>
+      <title>Learning Optimal NMF Models from Random Restarts</title>
+      <link>https://zachdebruine.com/post/learning-optimal-nmf-models-from-random-restarts/</link>
+      <pubDate>Wed, 20 Oct 2021 00:00:00 +0000</pubDate>
+      <guid>https://zachdebruine.com/post/learning-optimal-nmf-models-from-random-restarts/</guid>
+      <description>
+
+
+&lt;div id=&#34;nmf-initialization&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;NMF Initialization&lt;/h2&gt;
+&lt;p&gt;Non-negative matrix factorization (NMF) is NP-hard (&lt;a href=&#34;https://arxiv.org/abs/0708.4149&#34;&gt;Vavasis, 2007&lt;/a&gt;). As such, the best that NMF can do, in practice, is find the best discoverable local minima from some set of initializations.&lt;/p&gt;
+&lt;p&gt;Non-negative Double SVD (NNDSVD) has previously been proposed as a “head-start” for NMF (&lt;a href=&#34;https://www.sciencedirect.com/science/article/abs/pii/S0031320307004359&#34;&gt;Boutsidis, 2008&lt;/a&gt;). However, SVD and NMF are usually nothing alike, as SVD factors are sequentially interdependent while NMF factors are colinearly interdependent. Thus, whether “non-negative” SVD is useful remains unclear.&lt;/p&gt;
+&lt;p&gt;Random initializations are the most popular and promising method for NMF initialization. It is generally useful to attempt many random initializations to discover the best possible solution.&lt;/p&gt;
+&lt;p&gt;In this post I explore a number of initializations on the &lt;code&gt;hawaiibirds&lt;/code&gt;, &lt;code&gt;aml&lt;/code&gt;, and &lt;code&gt;movielens&lt;/code&gt; datasets, and a small single-cell dataset.&lt;/p&gt;
+&lt;/div&gt;
+&lt;div id=&#34;takeaways&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Takeaways&lt;/h2&gt;
+&lt;ul&gt;
+&lt;li&gt;SVD-based initializations (such as NNDSVD) are slower than random initializations, sometimes do worse, and are never better.&lt;/li&gt;
+&lt;li&gt;Multiple random initializations are useful for recovering the best discoverable NMF solution.&lt;/li&gt;
+&lt;li&gt;Normal random distributions (i.e. &lt;code&gt;rnorm(mean = 2, sd = 1)&lt;/code&gt;) slightly outperform uniform random distributions (i.e. &lt;code&gt;runif(min = 1, max = 2)&lt;/code&gt;) at finding the best NMF solution.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/div&gt;
+&lt;div id=&#34;non-negative-double-svd&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Non-negative Double SVD&lt;/h2&gt;
+&lt;p&gt;The following is an implementation of NNDSVD, adapted from the &lt;a href=&#34;https://github.com/renozao/NMF/blob/master/R/seed-nndsvd.R&#34;&gt;NMF package&lt;/a&gt;. In this function, the use of &lt;code&gt;irlba&lt;/code&gt; is a key performance improvement, and we do not do any form of zero-filling as I have found that this does not affect the outcome of RcppML NMF:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;nndsvd &amp;lt;- function(data, k) {
+
+  .pos &amp;lt;- function(x) { as.numeric(x &amp;gt;= 0) * x }
+  .neg &amp;lt;- function(x) {-as.numeric(x &amp;lt; 0) * x }
+  .norm &amp;lt;- function(x) { sqrt(drop(crossprod(x))) }
+
+  w = matrix(0, nrow(data), k)
+  s = irlba::irlba(data, k)
+  w[, 1] = sqrt(s$d[1]) * abs(s$u[, 1])
+
+  # second SVD for the other factors
+  for (i in 2:k) {
+    uu = s$u[, i]
+    vv = s$v[, i]
+    uup = .pos(uu)
+    uun = .neg(uu)
+    vvp = .pos(vv)
+    vvn = .neg(vv)
+    n_uup = .norm(uup)
+    n_vvp = .norm(vvp)
+    n_uun = .norm(uun)
+    n_vvn = .norm(vvn)
+    termp = as.double(n_uup %*% n_vvp)
+    termn = as.double(n_uun %*% n_vvn)
+    if (termp &amp;gt;= termn) {
+      w[, i] = (s$d[i] * termp)^0.5 * uup / n_uup
+    } else {
+      w[, i] = (s$d[i] * termn)^0.5 * uun / n_uun
+    }
+  }
+  w
+}&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;We can compare NNDSVD to normal SVD:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;library(irlba)
+library(RcppML)
+library(ggplot2)
+data(hawaiibirds)
+A &amp;lt;- hawaiibirds$counts
+m1 &amp;lt;- nndsvd(A, 2)
+m2 &amp;lt;- irlba(A, 2)
+df &amp;lt;- data.frame(&amp;quot;svd2&amp;quot; = m2$u[,2], &amp;quot;nndsvd2&amp;quot; = m1[,2])
+ggplot(df, aes(x = svd2, y = nndsvd2)) + 
+  geom_point() + 
+  labs(x = &amp;quot;second singular vector&amp;quot;, y = &amp;quot;second NNDSVD vector&amp;quot;) + 
+  theme_classic()&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;https://zachdebruine.com/post/learning-optimal-nmf-models-from-random-restarts/index.en_files/figure-html/unnamed-chunk-2-1.png&#34; width=&#34;240&#34; style=&#34;display: block; margin: auto auto auto 0;&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;We might also derive a much simpler form of NNDSVD which simply sets negative values in $u to zero:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;nndsvd2 &amp;lt;- function(data, k){
+  w &amp;lt;- irlba(data, k)$u
+  svd1 &amp;lt;- abs(w[,1])
+  w[w &amp;lt; 0] &amp;lt;- 0
+  w[,1] &amp;lt;- svd1
+  w
+}&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Finally, we could simply initialize with the signed SVD, and let NMF take care of imposing the non-negativity constraints:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;w_svd &amp;lt;- function(data, k){
+  irlba(data, k)$u
+}&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;div id=&#34;random-initializations&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Random Initializations&lt;/h2&gt;
+&lt;p&gt;We can test different random initializations using &lt;code&gt;runif&lt;/code&gt; and &lt;code&gt;rnorm&lt;/code&gt;. Hyperparameters to &lt;code&gt;runif&lt;/code&gt; are &lt;code&gt;min&lt;/code&gt; and &lt;code&gt;max&lt;/code&gt;, while hyperparameters to &lt;code&gt;rnorm&lt;/code&gt; are &lt;code&gt;mean&lt;/code&gt; and &lt;code&gt;sd&lt;/code&gt;. In both cases, our matrix must be non-negative.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;w_runif &amp;lt;- function(nrow, k, min, max, seed){
+  set.seed(seed)
+  matrix(runif(nrow * k, min, max), nrow, k)
+}
+
+w_rnorm &amp;lt;- function(nrow, k, mean, sd, seed){
+  set.seed(seed)
+  abs(matrix(rnorm(nrow * k, mean, sd), nrow, k))
+}&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Generate some initial &lt;code&gt;w&lt;/code&gt; matrices using these functions:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;library(cowplot)
+w1 &amp;lt;- w_runif(nrow(A), 10, 0, 1, 123)
+w2 &amp;lt;- w_runif(nrow(A), 10, 1, 2, 123)
+w3 &amp;lt;- w_rnorm(nrow(A), 10, 0, 1, 123)
+w4 &amp;lt;- w_rnorm(nrow(A), 10, 2, 1, 123)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;See how the distributions of these different models differ:&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://zachdebruine.com/post/learning-optimal-nmf-models-from-random-restarts/index.en_files/figure-html/unnamed-chunk-7-1.png&#34; width=&#34;480&#34; style=&#34;display: block; margin: auto auto auto 0;&#34; /&gt;&lt;/p&gt;
+&lt;/div&gt;
+&lt;div id=&#34;evaluating-initialization-methods&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Evaluating initialization methods&lt;/h2&gt;
+&lt;p&gt;We’ll use Mean Squared Error as a simple evaluation metric. We will compare results across several different datasets, as signal complexity can have a profound effect on recoverable NMF solution minima.&lt;/p&gt;
+&lt;div id=&#34;hawaiibirds-dataset&#34; class=&#34;section level3&#34;&gt;
+&lt;h3&gt;&lt;code&gt;hawaiibirds&lt;/code&gt; dataset&lt;/h3&gt;
+&lt;p&gt;First, we’ll look at the hawaii birds dataset. Since this is a small dataset, we will run 50 replicates of each random initialization to 100 iterations.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;data(hawaiibirds)
+results &amp;lt;- eval_initializations(
+  hawaiibirds$counts, k = 10, n_reps = 50, tol = 1e-10, maxit = 100)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;https://zachdebruine.com/post/learning-optimal-nmf-models-from-random-restarts/index.en_files/figure-html/unnamed-chunk-11-1.png&#34; width=&#34;432&#34; style=&#34;display: block; margin: auto auto auto 0;&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;UMAP plot of all models learned for each initialization:&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://zachdebruine.com/post/learning-optimal-nmf-models-from-random-restarts/index.en_files/figure-html/unnamed-chunk-12-1.png&#34; width=&#34;288&#34; style=&#34;display: block; margin: auto auto auto 0;&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;Clearly, &lt;code&gt;rnorm(mean = 2, sd = 1)&lt;/code&gt; has discovered a local minima that was not discovered by any other initialization method. Strikingly, it has done so while running faster than other methods.&lt;/p&gt;
+&lt;/div&gt;
+&lt;div id=&#34;movielens-dataset&#34; class=&#34;section level3&#34;&gt;
+&lt;h3&gt;&lt;code&gt;movielens&lt;/code&gt; dataset&lt;/h3&gt;
+&lt;p&gt;For this dataset, we will mask zeros, because 0’s indicate movies that have not been rated by the corresponding users.&lt;/p&gt;
+&lt;p&gt;We will stop factorizations at &lt;code&gt;tol = 1e-5&lt;/code&gt; and also track the number of iterations needed to get to that point.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;data(movielens)
+results &amp;lt;- eval_initializations(
+  movielens$ratings, k = 7, n_reps = 10, tol = 1e-5, maxit = 1000, mask = &amp;quot;zeros&amp;quot;)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;https://zachdebruine.com/post/learning-optimal-nmf-models-from-random-restarts/index.en_files/figure-html/unnamed-chunk-14-1.png&#34; width=&#34;624&#34; style=&#34;display: block; margin: auto auto auto 0;&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;UMAP plot of the learned models:&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://zachdebruine.com/post/learning-optimal-nmf-models-from-random-restarts/index.en_files/figure-html/unnamed-chunk-15-1.png&#34; width=&#34;288&#34; style=&#34;display: block; margin: auto auto auto 0;&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;Models here are much more similar, but &lt;code&gt;rnorm&lt;/code&gt; still does surprisingly well, requires surprisingly few iterations, and is quite fast. Almost entirely on-par with this initialization is &lt;code&gt;nndsvd&lt;/code&gt;.&lt;/p&gt;
+&lt;/div&gt;
+&lt;div id=&#34;aml-dataset&#34; class=&#34;section level3&#34;&gt;
+&lt;h3&gt;&lt;code&gt;aml&lt;/code&gt; dataset&lt;/h3&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;data(aml)
+results &amp;lt;- eval_initializations(aml, k = 10, n_reps = 25, tol = 1e-5)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;https://zachdebruine.com/post/learning-optimal-nmf-models-from-random-restarts/index.en_files/figure-html/unnamed-chunk-17-1.png&#34; width=&#34;624&#34; style=&#34;display: block; margin: auto auto auto 0;&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;and a UMAP plot of the learned models:&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://zachdebruine.com/post/learning-optimal-nmf-models-from-random-restarts/index.en_files/figure-html/unnamed-chunk-18-1.png&#34; width=&#34;288&#34; style=&#34;display: block; margin: auto auto auto 0;&#34; /&gt;&lt;/p&gt;
+&lt;/div&gt;
+&lt;div id=&#34;single-cell-data&#34; class=&#34;section level3&#34;&gt;
+&lt;h3&gt;Single-cell data&lt;/h3&gt;
+&lt;p&gt;Let’s have a look at the pbmc3k dataset made available in the &lt;code&gt;SeuratData&lt;/code&gt; package. This dataset is an example of complex signal with significant dropout and noise.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;library(Seurat)
+library(SeuratData)
+pbmc3k&lt;/code&gt;&lt;/pre&gt;
+&lt;pre&gt;&lt;code&gt;## An object of class Seurat 
+## 13714 features across 2700 samples within 1 assay 
+## Active assay: RNA (13714 features, 0 variable features)&lt;/code&gt;&lt;/pre&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;pbmc &amp;lt;- pbmc3k@assays$RNA@counts
+results_pbmc3k &amp;lt;- eval_initializations(pbmc, k = 7, n_reps = 20, tol = 1e-5)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;https://zachdebruine.com/post/learning-optimal-nmf-models-from-random-restarts/index.en_files/figure-html/unnamed-chunk-21-1.png&#34; width=&#34;624&#34; style=&#34;display: block; margin: auto auto auto 0;&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://zachdebruine.com/post/learning-optimal-nmf-models-from-random-restarts/index.en_files/figure-html/unnamed-chunk-22-1.png&#34; width=&#34;288&#34; style=&#34;display: block; margin: auto auto auto 0;&#34; /&gt;&lt;/p&gt;
+&lt;/div&gt;
+&lt;div id=&#34;normalized-single-cell-data&#34; class=&#34;section level3&#34;&gt;
+&lt;h3&gt;Normalized Single-Cell Data&lt;/h3&gt;
+&lt;p&gt;Log-normalize single cell data and see how these changes in the distribution affect the ideal initialization method:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;pbmc_norm &amp;lt;- LogNormalize(pbmc)
+results_pbmc_norm &amp;lt;- eval_initializations(pbmc_norm, k = 7, n_reps = 20, tol = 1e-5)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;https://zachdebruine.com/post/learning-optimal-nmf-models-from-random-restarts/index.en_files/figure-html/unnamed-chunk-24-1.png&#34; width=&#34;624&#34; style=&#34;display: block; margin: auto auto auto 0;&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://zachdebruine.com/post/learning-optimal-nmf-models-from-random-restarts/index.en_files/figure-html/unnamed-chunk-25-1.png&#34; width=&#34;288&#34; style=&#34;display: block; margin: auto auto auto 0;&#34; /&gt;&lt;/p&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;div id=&#34;takeaways-so-far&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Takeaways so far&lt;/h2&gt;
+&lt;p&gt;&lt;strong&gt;Runtime:&lt;/strong&gt;
+* &lt;code&gt;rnorm&lt;/code&gt; and &lt;code&gt;runif&lt;/code&gt;. Consistently faster than SVD-based initializations. There is no convincing difference between &lt;code&gt;rnorm&lt;/code&gt; and &lt;code&gt;runif&lt;/code&gt;.&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;Loss:&lt;/strong&gt;
+* with multiple starts, &lt;code&gt;rnorm(2, 1)&lt;/code&gt; never does worse than any other method, but performs worse on average than &lt;code&gt;runif&lt;/code&gt; in single-cell data.
+* &lt;code&gt;nndsvd&lt;/code&gt; performs as well as &lt;code&gt;runif&lt;/code&gt; in &lt;code&gt;aml&lt;/code&gt; and single-cell data, but takes longer. It performs worse than &lt;code&gt;runif&lt;/code&gt; in &lt;code&gt;movielens&lt;/code&gt; data (by a lot), and better than &lt;code&gt;runif&lt;/code&gt; in hawaiibirds (but not as well as &lt;code&gt;rnorm&lt;/code&gt;)&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;Iterations:&lt;/strong&gt;
+* &lt;code&gt;runif&lt;/code&gt; does at least as well as, or better than, all other methods.&lt;/p&gt;
+&lt;p&gt;Spectral decompositions such as &lt;code&gt;nndsvd&lt;/code&gt; do not out-perform random initialization-based methods such as &lt;code&gt;rnorm&lt;/code&gt; or &lt;code&gt;runif&lt;/code&gt; consistently. In addition, they require that an SVD be run, which increases the total runtime.&lt;/p&gt;
+&lt;/div&gt;
+&lt;div id=&#34;optimizing-runif&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Optimizing runif&lt;/h2&gt;
+&lt;p&gt;It is possible that changing the bounds of the uniform distribution may affect the results.&lt;/p&gt;
+&lt;p&gt;We will address whether the width of the bounds matters, and the proximity of the lower-bound to zero. We will look at bounds in the range (0, 1), (0, 2), (0, 10), (1, 2), (1, 10), and (2, 10):&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;results_hibirds &amp;lt;- eval_runif(hawaiibirds$counts, k = 10, n_reps = 20, tol = 1e-6)
+results_aml &amp;lt;- eval_runif(aml, k = 12, n_reps = 20)
+results_movielens &amp;lt;- eval_runif(movielens$ratings, k = 7, n_reps = 20, mask = &amp;quot;zeros&amp;quot;)
+results_pbmc &amp;lt;- eval_runif(pbmc, k = 7, n_reps = 20)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;https://zachdebruine.com/post/learning-optimal-nmf-models-from-random-restarts/index.en_files/figure-html/unnamed-chunk-28-1.png&#34; width=&#34;576&#34; style=&#34;display: block; margin: auto auto auto 0;&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;These results show no consistent recipe for finding the best minima, but that there is considerable dataset-specific variation.&lt;/p&gt;
+&lt;p&gt;However, it is clear that varying the lower and upper bounds of &lt;code&gt;runif&lt;/code&gt; across restarts is likely to be useful.&lt;/p&gt;
+&lt;/div&gt;
+&lt;div id=&#34;optimizing-rnorm&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Optimizing rnorm&lt;/h2&gt;
+&lt;p&gt;Changing the mean and standard deviation of the absolute value of a normal distribution can generate non-normal distributions, in fact, it can generate distributions quite like a gamma distribution. Thus, we will investigate some different combinations of mean and standard deviation: (0, 0.5), (0, 1), (0, 2), (1, 0.5), (1, 1), and (2, 1):&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;results_hibirds &amp;lt;- eval_rnorm(hawaiibirds$counts, k = 10, n_reps = 20, tol = 1e-6)
+results_aml &amp;lt;- eval_rnorm(aml, k = 12, n_reps = 20)
+results_movielens &amp;lt;- eval_rnorm(movielens$ratings, k = 7, n_reps = 20, mask = &amp;quot;zeros&amp;quot;)
+results_pbmc &amp;lt;- eval_rnorm(pbmc, k = 7, n_reps = 20)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;https://zachdebruine.com/post/learning-optimal-nmf-models-from-random-restarts/index.en_files/figure-html/unnamed-chunk-31-1.png&#34; width=&#34;576&#34; style=&#34;display: block; margin: auto auto auto 0;&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;Here it’s more difficult to pick a winner, they really perform similarly. For the &lt;code&gt;pbmc3k&lt;/code&gt; dataset, however, &lt;code&gt;rnorm(2,1)&lt;/code&gt; is probably the best choice. This distribution is largely normal, as opposed to gamma (i.e. &lt;code&gt;rnorm(0, 0.5)&lt;/code&gt;, which could be seen as the “loser”) or a lopsided bell-curve shaped (i.e. `rnorm(1, 1)).&lt;/p&gt;
+&lt;/div&gt;
+</description>
+    </item>
+    
+    <item>
+      <title>Statistical properties of L1- and L2-regularized NMF</title>
+      <link>https://zachdebruine.com/post/l2-regularized-nmf/</link>
+      <pubDate>Mon, 18 Oct 2021 00:00:00 +0000</pubDate>
+      <guid>https://zachdebruine.com/post/l2-regularized-nmf/</guid>
+      <description>
+
+
+&lt;div id=&#34;key-takeaways&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Key Takeaways&lt;/h2&gt;
+&lt;p&gt;For non-negative matrix factorization:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;L1 and L2 regularization require diagonalization (factorization of the form &lt;span class=&#34;math inline&#34;&gt;\(A = wdh\)&lt;/span&gt;)&lt;/li&gt;
+&lt;li&gt;L1 is a sparsifying, L2 is densifying&lt;/li&gt;
+&lt;li&gt;L1 increases angle between factors, L2 decreases angle between factors&lt;/li&gt;
+&lt;li&gt;L1 penalties cause factors to converge collectively towards a k-means clustering model, L2 penalties cause each factor to converge individually towards the first singular vector&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/div&gt;
+&lt;div id=&#34;regularizing-nmf&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Regularizing NMF&lt;/h2&gt;
+&lt;p&gt;Regularizations are intended to improve the interpretability or identifiability of linear models. Consider the least squares problem &lt;span class=&#34;math inline&#34;&gt;\(ax = b\)&lt;/span&gt;, for which common regularizations include:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;L1/LASSO&lt;/strong&gt; regularization: absolute shrinkage, penalty subtracted from &lt;span class=&#34;math inline&#34;&gt;\(b\)&lt;/span&gt;&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;L2/Ridge&lt;/strong&gt; regularization: convex shrinkage, penalty added to diagonal of &lt;span class=&#34;math inline&#34;&gt;\(a\)&lt;/span&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;In a typical non-negative least squares (NNLS) fit, these regularizations behave usefully. For example, an L1 penalty equal to the maximum value in &lt;span class=&#34;math inline&#34;&gt;\(b\)&lt;/span&gt; will ensure complete sparsity of the solution.&lt;/p&gt;
+&lt;p&gt;Now consider NMF by alternating least squares. NMF differs from one-off least squares problems in several ways:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;It is iterative&lt;/li&gt;
+&lt;li&gt;The initial distribution of the models are unknown (i.e. projection of random factors)&lt;/li&gt;
+&lt;li&gt;The distribution of a model at a given iteration is dependent on that of the models at all previous iterations&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Thus, NMF regularizations have a chain effect: a change in one iteration will lead to a change in information and distribution in the next, and so forth. Thus, if the distribution of the model is not controlled after each update, penalties will cause the model to spiral out of control.&lt;/p&gt;
+&lt;/div&gt;
+&lt;div id=&#34;controlling-nmf-model-distributions-during-updates&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Controlling NMF model distributions during updates&lt;/h2&gt;
+&lt;p&gt;NMF minimizes &lt;span class=&#34;math inline&#34;&gt;\(A = wh\)&lt;/span&gt;. The least squares update of &lt;span class=&#34;math inline&#34;&gt;\(h\)&lt;/span&gt;, column &lt;span class=&#34;math inline&#34;&gt;\(j\)&lt;/span&gt; given &lt;span class=&#34;math inline&#34;&gt;\(A\)&lt;/span&gt; and &lt;span class=&#34;math inline&#34;&gt;\(w\)&lt;/span&gt; is:&lt;/p&gt;
+&lt;p&gt;&lt;span class=&#34;math display&#34;&gt;\[w^Twh_j = w^TA_j\]&lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;Correspondingly, the least squares update of &lt;span class=&#34;math inline&#34;&gt;\(w\)&lt;/span&gt;, row &lt;span class=&#34;math inline&#34;&gt;\(j\)&lt;/span&gt;, given &lt;span class=&#34;math inline&#34;&gt;\(A\)&lt;/span&gt; and &lt;span class=&#34;math inline&#34;&gt;\(h\)&lt;/span&gt; is:&lt;/p&gt;
+&lt;p&gt;&lt;span class=&#34;math display&#34;&gt;\[hh^Tw_j = hA^T_j\]&lt;/span&gt;
+These equations are in the form &lt;span class=&#34;math inline&#34;&gt;\(ax = b\)&lt;/span&gt;. For instance, in the update of &lt;span class=&#34;math inline&#34;&gt;\(h\)&lt;/span&gt;, &lt;span class=&#34;math inline&#34;&gt;\(a = w^Tw\)&lt;/span&gt; and &lt;span class=&#34;math inline&#34;&gt;\(b = w^TA_j\)&lt;/span&gt;.&lt;/p&gt;
+&lt;p&gt;For a regularization penalty strictly in the range (0, 1], we want to guarantee that the penalty will be consistent across random NMF restarts, different datasets, and across alternating least squares updates. To guarantee consistent application of the penalty, we need to control the distribution of &lt;span class=&#34;math inline&#34;&gt;\(a\)&lt;/span&gt; and &lt;span class=&#34;math inline&#34;&gt;\(b\)&lt;/span&gt;.&lt;/p&gt;
+&lt;p&gt;The distribution of a model can be controlled by diagonalizing the NMF model, such that &lt;span class=&#34;math inline&#34;&gt;\(A = wdh\)&lt;/span&gt;, where columns in &lt;span class=&#34;math inline&#34;&gt;\(w\)&lt;/span&gt; and rows in &lt;span class=&#34;math inline&#34;&gt;\(h\)&lt;/span&gt; are scaled to sum to 1 by a scaling diagonal, &lt;span class=&#34;math inline&#34;&gt;\(d\)&lt;/span&gt;. Factors need not scale to 1, it could be any constant value, but 1 provides nice interpretability.&lt;/p&gt;
+&lt;/div&gt;
+&lt;div id=&#34;diagonalized-nmf-enables-convex-regularization&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Diagonalized NMF enables convex regularization&lt;/h2&gt;
+&lt;p&gt;Let’s load the &lt;code&gt;hawaiibirds&lt;/code&gt; dataset and factorize the data at several L1 and L2 penalties, with and without model diagonalization, also calculating various statistics such as sparsity, similarity to k-means clustering, and similarity to the first singular vector.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;# devtools::install_github(&amp;quot;zdebruine/RcppML&amp;quot;)
+library(RcppML)
+data(hawaiibirds)
+A &amp;lt;- hawaiibirds$counts&lt;/code&gt;&lt;/pre&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;alphas &amp;lt;- c(c(1, 3, 5, 9) %o% 10^(-3:-1)) # c(seq(0, 0.1, 0.005), seq(0.11, 0.5, 0.01)) # seq(0, 0.98, 0.02)
+seeds &amp;lt;- c(123, 456, 789)
+kmeans_centers &amp;lt;- t(kmeans(t(as.matrix(A)), 10)$centers)
+svd1 &amp;lt;- nmf(A, 1)@w
+df &amp;lt;- data.frame()
+for(alpha in alphas){
+  for(seed in seeds){
+    for(diag in c(FALSE, TRUE)){
+      m &amp;lt;- nmf(A, 10, seed = seed, diag = diag)
+        for(penalty in c(&amp;quot;L1&amp;quot;, &amp;quot;L2&amp;quot;)){
+        m_ &amp;lt;- nmf(A, 10, seed = seed, diag = diag,
+                   L1 = ifelse(penalty == &amp;quot;L1&amp;quot;, alpha, 0), 
+                   L2 = ifelse(penalty == &amp;quot;L2&amp;quot;, alpha, 0),
+                  )
+        df &amp;lt;- rbind(df, data.frame(
+          &amp;quot;alpha&amp;quot; = alpha,
+          &amp;quot;seed&amp;quot; = seed,
+          &amp;quot;diag&amp;quot; = diag,
+          &amp;quot;penalty&amp;quot; = penalty,
+          &amp;quot;sparsity&amp;quot; = sum(m_@w == 0) / prod(dim(m_@w)),
+          &amp;quot;robustness&amp;quot; = 1 - bipartiteMatch(1 - cosine(m_@w, m@w))$cost/10,
+          &amp;quot;mse&amp;quot; = evaluate(m_, A),
+          &amp;quot;mean_angle&amp;quot; = mean(cosine(m_@w)),
+          &amp;quot;kmeans&amp;quot; = bipartiteMatch(1 - cosine(kmeans_centers, m_@w))$cost/10,
+          &amp;quot;svd1&amp;quot; = sum(cosine(m_@w, svd1))/10,
+          &amp;quot;color&amp;quot; = ifelse(penalty == &amp;quot;L1&amp;quot;, alpha^0.25, -alpha^0.25)
+        ))      
+      }
+    }
+  }
+}
+df$penalty &amp;lt;- factor(df$penalty)
+df$seed &amp;lt;- factor(df$seed)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;https://zachdebruine.com/post/l2-regularized-nmf/index.en_files/figure-html/unnamed-chunk-2-1.png&#34; width=&#34;768&#34; style=&#34;display: block; margin: auto auto auto 0;&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;Takeaways:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Diagonal scaling guarantees consistent regularization between independent replicates (compare &lt;strong&gt;a&lt;/strong&gt;, &lt;strong&gt;c&lt;/strong&gt; with &lt;strong&gt;b&lt;/strong&gt;, &lt;strong&gt;d&lt;/strong&gt;)&lt;/li&gt;
+&lt;li&gt;L1 regularization increases sparsity of factor models (&lt;strong&gt;b&lt;/strong&gt;) while L2 regularization promotes density of the model (&lt;strong&gt;d&lt;/strong&gt;)&lt;/li&gt;
+&lt;li&gt;L1 = 1 guarantees complete sparsity (&lt;strong&gt;b&lt;/strong&gt;) while L2 = 1 guarantees complete density (&lt;strong&gt;d&lt;/strong&gt;)&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;We might not have expected that L2 is a densifying factorization. Why is this? L2 convexly shrinks values towards zero, and as such decreases the condition number of &lt;span class=&#34;math inline&#34;&gt;\(a\)&lt;/span&gt;. This means signals will be encouraged to “squash” together, and factors in the resulting model will begin to describe similar signal. As this occurs, the model naturally becomes denser until a point is reached that the objective is minimized (at convergence).&lt;/p&gt;
+&lt;/div&gt;
+&lt;div id=&#34;properties-of-l1--and-l2-regularized-nmf&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Properties of L1- and L2-regularized NMF&lt;/h2&gt;
+&lt;p&gt;Let’s consider how L1 and L2 regularizations affect the robustness of information content of factor models relative to the unregularized equivalent, and how they affect the mean squared error loss of the models.&lt;/p&gt;
+&lt;p&gt;As a measure of the robustness of information content, we use the mean cost of bipartite matching between L1-regularized and unregularized &lt;span class=&#34;math inline&#34;&gt;\(w\)&lt;/span&gt; models on a cosine similarity matrix.&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://zachdebruine.com/post/l2-regularized-nmf/index.en_files/figure-html/unnamed-chunk-3-1.png&#34; width=&#34;672&#34; style=&#34;display: block; margin: auto auto auto 0;&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;Notice how the L2 penalties tend to be much harsher than the L1 penalties. However, both penalties cause movement of the model away from the unregularized state.&lt;/p&gt;
+&lt;p&gt;Within the models themselves, we can examine how similar factors are to one another by measuring the mean cosine angle:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;ggplot(subset(df, diag == TRUE &amp;amp; seed == 123), aes(x = alpha, y = mean_angle, color = penalty)) +
+  geom_point() + labs(x = &amp;quot;alpha&amp;quot;, y = &amp;quot;mean cosine angle\nbetween factors&amp;quot;) +
+  theme_classic() + theme(aspect.ratio = 1) + scale_x_continuous(trans = &amp;quot;sqrt&amp;quot;) +
+  stat_smooth(se = F)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;https://zachdebruine.com/post/l2-regularized-nmf/index.en_files/figure-html/unnamed-chunk-4-1.png&#34; width=&#34;384&#34; style=&#34;display: block; margin: auto auto auto 0;&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;We can see that L1 penalty increases the distance between factors, while L2 penalty increases the similarity between factors.&lt;/p&gt;
+&lt;p&gt;Now let’s take a look at how L1 and L2 penalties affect the sparsity of factors, and also calculate the similarity of these models to a k-means clustering or the first singular vector (given by a rank-1 NMF):&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://zachdebruine.com/post/l2-regularized-nmf/index.en_files/figure-html/unnamed-chunk-5-1.png&#34; width=&#34;672&#34; style=&#34;display: block; margin: auto auto auto 0;&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;L1 is sparsifying while L2 is densifying.&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://zachdebruine.com/post/l2-regularized-nmf/index.en_files/figure-html/unnamed-chunk-6-1.png&#34; width=&#34;672&#34; style=&#34;display: block; margin: auto auto auto 0;&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;Here, L1 promotes a k-means clustering model while L2 promotes convergence towards the first singular vector.&lt;/p&gt;
+&lt;/div&gt;
+&lt;div id=&#34;interpreting-l1--and-l2-regularized-factor-models&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Interpreting L1- and L2-regularized factor models&lt;/h2&gt;
+&lt;p&gt;We’ll select regularization parameters for further analysis based on a cosine angle of about 0.25 away from the original model:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;model    &amp;lt;- nmf(A, 10, tol = 1e-6, seed = 123)
+model_L1 &amp;lt;- nmf(A, 10, tol = 1e-6, seed = 123, L1 = 0.2)
+model_L2 &amp;lt;- nmf(A, 10, tol = 1e-6, seed = 123, L2 = 0.02)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Take a look at the clustering of factors in the &lt;span class=&#34;math inline&#34;&gt;\(w\)&lt;/span&gt; models on UMAP coordinates:&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://zachdebruine.com/post/l2-regularized-nmf/index.en_files/figure-html/unnamed-chunk-8-1.png&#34; width=&#34;288&#34; style=&#34;display: block; margin: auto auto auto 0;&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;Similar information is clearly being captured by each of the models, but let’s see in what way.&lt;/p&gt;
+&lt;p&gt;We’ll align factors in the regularized models to the unregularized models, and then compare specific factors.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;library(ggrepel)
+biplot &amp;lt;- function(model1, model2, factor){
+  df &amp;lt;- data.frame(&amp;quot;model1&amp;quot; = model1$w[, factor], &amp;quot;model2&amp;quot; = model2$w[, factor], &amp;quot;label&amp;quot; = rownames(model1$w))
+  ggplot(df, aes(x = model1, y = model2, label = label)) + geom_point() + theme_classic() + geom_text_repel(size = 2.5)
+}
+
+model_L1 &amp;lt;- align(model_L1, model)
+model_L2 &amp;lt;- align(model_L2, model)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;https://zachdebruine.com/post/l2-regularized-nmf/index.en_files/figure-html/unnamed-chunk-10-1.png&#34; width=&#34;576&#34; style=&#34;display: block; margin: auto auto auto 0;&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;These are very harsh penalties, so notice how L1 can over-sparsify things, while L2 can generate factors that are so dense the information is hardly specific or informative.&lt;/p&gt;
+&lt;p&gt;A happy medium for sparsifying (or densifying) regularization certainly exists, and this is an objective hyperparameter that must be determined against the objectives of the analysis. Unfortunately, there is nothing against which to optimize – this appears to be a matter of statistical taste.&lt;/p&gt;
+&lt;/div&gt;
+&lt;div id=&#34;future-directions&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Future directions&lt;/h2&gt;
+&lt;ul&gt;
+&lt;li&gt;Effect of L1 and L2 regularizations on factorization rank&lt;/li&gt;
+&lt;li&gt;Intuition behind one-sided L1 and L2 regularization&lt;/li&gt;
+&lt;li&gt;Intuition behind combined L1/L2 or one-sided L1 vs. one-sided L2&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/div&gt;
+</description>
+    </item>
+    
+    <item>
+      <title>Cross-validation for NMF rank determination</title>
+      <link>https://zachdebruine.com/post/cross-validation-for-nmf-rank-determination/</link>
+      <pubDate>Sun, 17 Oct 2021 00:00:00 +0000</pubDate>
+      <guid>https://zachdebruine.com/post/cross-validation-for-nmf-rank-determination/</guid>
+      <description>
+
+
+&lt;div id=&#34;cross-validation-for-nmf&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Cross-Validation for NMF&lt;/h2&gt;
+&lt;p&gt;Rank is the most important hyperparameter in NMF. Finding that “sweet spot” rank can make the difference between learning a useful model that captures meaningful signal (but not noise) or learning a garbage model that misses good signal or focuses too much on useless noise.&lt;/p&gt;
+&lt;p&gt;Alex Williams has posted a great introduction to cross-validation for NMF on his &lt;a href=&#34;http://alexhwilliams.info/itsneuronalblog/2018/02/26/crossval/&#34;&gt;blog&lt;/a&gt;. His review of the first two methods is particularly intuitive. However, the third method is both theoretically questionable and poor in practice.&lt;/p&gt;
+&lt;p&gt;There are three “unsupervised” cross-validation methods for NMF which I have found to be useful:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;Bi-cross-validation&lt;/strong&gt;, proposed by &lt;a href=&#34;https://projecteuclid.org/journals/annals-of-applied-statistics/volume-3/issue-2/Bi-cross-validation-of-the-SVD-and-the/10.1214/08-AOAS227.full&#34;&gt;Perry&lt;/a&gt; and explained simply by &lt;a href=&#34;http://alexhwilliams.info/itsneuronalblog/2018/02/26/crossval/&#34;&gt;Williams&lt;/a&gt;. The “Bi-” in “Bi-cross-validation” means that the model is trained on a block of randomly selected samples and features and evaluated on a non-intersecting block of samples and features. Thus, no samples or features in the test set are included in the training set. If the test and training sets contain samples in common, or features in common, NMF gets to “cheat” in training and directly infer patterns of regulation, and thus basic subsample-cross-validation with NMF does not work.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Imputation&lt;/strong&gt;, described nicely by &lt;a href=&#34;https://bmcbioinformatics.biomedcentral.com/articles/10.1186/s12859-019-3312-5&#34;&gt;Lin&lt;/a&gt; and also reviewed in this StackExchange post by &lt;a href=&#34;https://stats.stackexchange.com/questions/111205/how-to-choose-an-optimal-number-of-latent-factors-in-non-negative-matrix-factori&#34;&gt;amoeba&lt;/a&gt;. Here, a small fraction of values (i.e. 5%) are “masked” and considered as missing during factorization, and the mean squared error of the imputed values is calculated after model training.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Robustness&lt;/strong&gt; is simply the cosine similarity of matched factors in independent models trained on non-overlapping sample sets. The premise is that noise capture will result in low similarity, while efficient signal capture will result in high similarity. Furthermore, approximations which are too low-rank will not classify signals in the same manner, leading to poor factor matching.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/div&gt;
+&lt;div id=&#34;takeaways&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Takeaways&lt;/h2&gt;
+&lt;ul&gt;
+&lt;li&gt;The &lt;code&gt;project&lt;/code&gt; method (bi-cross-validation) is useful for well-conditioned signal.&lt;/li&gt;
+&lt;li&gt;The &lt;code&gt;robust&lt;/code&gt; method (similarity of independent factorizations) is generally the most informative for noisy data possibly suffering from signal dropout.&lt;/li&gt;
+&lt;li&gt;The &lt;code&gt;imputation&lt;/code&gt; method is the slowest of the three, but generally the most sensitive.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/div&gt;
+&lt;div id=&#34;install-rcppml&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Install RcppML&lt;/h2&gt;
+&lt;p&gt;Install the development version of RcppML:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;devtools::install_github(&amp;quot;zdebruine/RcppML&amp;quot;)&lt;/code&gt;&lt;/pre&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;library(RcppML)
+library(ggplot2)
+library(cowplot)
+library(umap)
+library(irlba)&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;div id=&#34;simulated-data&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Simulated data&lt;/h2&gt;
+&lt;p&gt;Simulated data is useful for demonstrating the utility of methods in response to adversarial perturbations such as noise or dropout.&lt;/p&gt;
+&lt;p&gt;We will first explore cross-validation using two simulated datasets generated with &lt;code&gt;simulateNMF&lt;/code&gt;:&lt;/p&gt;
+&lt;ol style=&#34;list-style-type: decimal&#34;&gt;
+&lt;li&gt;&lt;code&gt;data_clean&lt;/code&gt; will have no noise or signal dropout&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;data_dirty&lt;/code&gt; contains the same signal as &lt;code&gt;data_clean&lt;/code&gt;, but with a good amount of noise and dropout.&lt;/li&gt;
+&lt;/ol&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;data_clean &amp;lt;- simulateNMF(nrow = 200, ncol = 200, k = 5, noise = 0, dropout = 0, seed = 123)
+data_dirty &amp;lt;- simulateNMF(nrow = 200, ncol = 200, k = 5, noise = 0.5, dropout = 0.5, seed = 123)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Notice how &lt;code&gt;data_clean&lt;/code&gt; contains only 5 non-zero singular values, while &lt;code&gt;data_dirty&lt;/code&gt; does not:&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://zachdebruine.com/post/cross-validation-for-nmf-rank-determination/index.en_files/figure-html/unnamed-chunk-2-1.png&#34; width=&#34;240&#34; style=&#34;display: block; margin: auto auto auto 0;&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;We can use &lt;code&gt;RcppML::crossValidate&lt;/code&gt; to determine the rank of each dataset. The default method uses “bi-cross-validation”. See &lt;code&gt;?crossValidate&lt;/code&gt; for details.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;cv_clean &amp;lt;- crossValidate(data_clean, k = 1:10, method = &amp;quot;predict&amp;quot;, reps = 3, seed = 123)
+cv_dirty &amp;lt;- crossValidate(data_dirty, k = 1:10, method = &amp;quot;predict&amp;quot;, reps = 3, seed = 123)
+plot_grid(
+  plot(cv_clean) + ggtitle(&amp;quot;bi-cross-validation on\nclean dataset&amp;quot;),
+  plot(cv_dirty) + ggtitle(&amp;quot;bi-cross-validation on\ndirty dataset&amp;quot;), nrow = 1)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;https://zachdebruine.com/post/cross-validation-for-nmf-rank-determination/index.en_files/figure-html/unnamed-chunk-3-1.png&#34; width=&#34;576&#34; style=&#34;display: block; margin: auto auto auto 0;&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;crossValidate&lt;/code&gt; also supports another method which compares robustness of two factorizations on independent sample subsets.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;cv_clean &amp;lt;- crossValidate(data_clean, k = 1:10, method = &amp;quot;robust&amp;quot;, reps = 3, seed = 123)
+cv_dirty &amp;lt;- crossValidate(data_dirty, k = 1:10, method = &amp;quot;robust&amp;quot;, reps = 3, seed = 123)
+plot_grid(
+  plot(cv_clean) + ggtitle(&amp;quot;robust cross-validation on\nclean dataset&amp;quot;),
+  plot(cv_dirty) + ggtitle(&amp;quot;robust cross-validation on\ndirty dataset&amp;quot;), nrow = 1)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;https://zachdebruine.com/post/cross-validation-for-nmf-rank-determination/index.en_files/figure-html/unnamed-chunk-4-1.png&#34; width=&#34;576&#34; style=&#34;display: block; margin: auto auto auto 0;&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;This second method does better on ill-conditioned data because it measures the robustness between independent factorizations.&lt;/p&gt;
+&lt;p&gt;Finally, we can use the &lt;code&gt;impute&lt;/code&gt; method:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;cv_clean &amp;lt;- crossValidate(data_clean, k = 1:10, method = &amp;quot;impute&amp;quot;, reps = 3, seed = 123)
+cv_dirty &amp;lt;- crossValidate(data_dirty, k = 1:10, method = &amp;quot;impute&amp;quot;, reps = 3, seed = 123)
+plot_grid(
+  plot(cv_clean) + ggtitle(&amp;quot;impute cross-validation on\nclean dataset&amp;quot;) + scale_y_continuous(trans = &amp;quot;log10&amp;quot;),
+  plot(cv_dirty) + ggtitle(&amp;quot;impute cross-validation on\ndirty dataset&amp;quot;) + scale_y_continuous(trans = &amp;quot;log10&amp;quot;), nrow = 1)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;https://zachdebruine.com/post/cross-validation-for-nmf-rank-determination/index.en_files/figure-html/unnamed-chunk-5-1.png&#34; width=&#34;576&#34; style=&#34;display: block; margin: auto auto auto 0;&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;For real datasets, it is important to experiment with both cross-validation methods and to explore multi-resolution analysis or other objectives where appropriate.&lt;/p&gt;
+&lt;p&gt;Let’s take a look at a real dataset:&lt;/p&gt;
+&lt;/div&gt;
+&lt;div id=&#34;finding-the-rank-of-the-hawaiibirds-dataset&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Finding the rank of the &lt;code&gt;hawaiibirds&lt;/code&gt; dataset&lt;/h2&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;data(hawaiibirds)
+A &amp;lt;- hawaiibirds$counts
+cv_predict &amp;lt;- crossValidate(A, k = 1:20, method = &amp;quot;predict&amp;quot;, reps = 3, seed = 123)
+cv_robust &amp;lt;- crossValidate(A, k = 1:20, method = &amp;quot;robust&amp;quot;, reps = 3, seed = 123)
+cv_impute &amp;lt;- crossValidate(A, k = 1:20, method = &amp;quot;impute&amp;quot;, reps = 3, seed = 123)
+plot_grid(
+  plot(cv_predict) + ggtitle(&amp;quot;method = &amp;#39;predict&amp;#39;&amp;quot;) + theme(legend.position = &amp;quot;none&amp;quot;),
+  plot(cv_robust) + ggtitle(&amp;quot;method = &amp;#39;robust&amp;#39;&amp;quot;) + theme(legend.position = &amp;quot;none&amp;quot;),
+  plot(cv_impute) + ggtitle(&amp;quot;method = &amp;#39;impute&amp;#39;&amp;quot;) + scale_y_continuous(trans = &amp;quot;log10&amp;quot;) + theme(legend.position = &amp;quot;none&amp;quot;),
+  get_legend(plot(cv_predict)), rel_widths = c(1, 1, 1, 0.4), nrow = 1, labels = &amp;quot;auto&amp;quot;)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;https://zachdebruine.com/post/cross-validation-for-nmf-rank-determination/index.en_files/figure-html/unnamed-chunk-6-1.png&#34; width=&#34;768&#34; style=&#34;display: block; margin: auto auto auto 0;&#34; /&gt;&lt;/p&gt;
+&lt;/div&gt;
+&lt;div id=&#34;finding-the-rank-of-the-aml-dataset&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Finding the rank of the &lt;code&gt;aml&lt;/code&gt; dataset&lt;/h2&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;data(aml)
+cv_impute &amp;lt;- crossValidate(aml, k = 2:14, method = &amp;quot;impute&amp;quot;, reps = 3, seed = 123)
+plot(cv_impute) + scale_y_continuous(trans = &amp;quot;log10&amp;quot;)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;https://zachdebruine.com/post/cross-validation-for-nmf-rank-determination/index.en_files/figure-html/unnamed-chunk-7-1.png&#34; width=&#34;768&#34; style=&#34;display: block; margin: auto auto auto 0;&#34; /&gt;&lt;/p&gt;
+&lt;/div&gt;
+&lt;div id=&#34;technical-considerations&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Technical considerations&lt;/h2&gt;
+&lt;p&gt;Runtime is a major consideration for large datasets. Unfortunately, missing value imputation can be very slow.&lt;/p&gt;
+&lt;/div&gt;
+&lt;div id=&#34;perturb&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Perturb&lt;/h2&gt;
+&lt;p&gt;Compare missing value imputation with perturb (zeros) and perturb (random):&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;data(hawaiibirds)
+data(aml)
+data(movielens)
+library(Seurat)&lt;/code&gt;&lt;/pre&gt;
+&lt;pre&gt;&lt;code&gt;## Warning: package &amp;#39;Seurat&amp;#39; was built under R version 4.0.5&lt;/code&gt;&lt;/pre&gt;
+&lt;pre&gt;&lt;code&gt;## Attaching SeuratObject&lt;/code&gt;&lt;/pre&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;library(SeuratData)&lt;/code&gt;&lt;/pre&gt;
+&lt;pre&gt;&lt;code&gt;## Registered S3 method overwritten by &amp;#39;cli&amp;#39;:
+##   method     from         
+##   print.boxx spatstat.geom&lt;/code&gt;&lt;/pre&gt;
+&lt;pre&gt;&lt;code&gt;## -- Installed datasets ------------------------------------- SeuratData v0.2.1 --&lt;/code&gt;&lt;/pre&gt;
+&lt;pre&gt;&lt;code&gt;## v bmcite       0.3.0                    v pbmc3k       3.1.4
+## v hcabm40k     3.0.0                    v pbmcMultiome 0.1.0
+## v ifnb         3.1.0                    v pbmcsca      3.0.0
+## v panc8        3.0.2                    v stxBrain     0.1.1&lt;/code&gt;&lt;/pre&gt;
+&lt;pre&gt;&lt;code&gt;## -------------------------------------- Key -------------------------------------&lt;/code&gt;&lt;/pre&gt;
+&lt;pre&gt;&lt;code&gt;## v Dataset loaded successfully
+## &amp;gt; Dataset built with a newer version of Seurat than installed
+## (?) Unknown version of Seurat installed&lt;/code&gt;&lt;/pre&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;pbmc3k&lt;/code&gt;&lt;/pre&gt;
+&lt;pre&gt;&lt;code&gt;## An object of class Seurat 
+## 13714 features across 2700 samples within 1 assay 
+## Active assay: RNA (13714 features, 0 variable features)&lt;/code&gt;&lt;/pre&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;A &amp;lt;- pbmc3k@assays$RNA@counts
+
+n &amp;lt;- 0.2
+method = &amp;quot;impute&amp;quot;
+cv1 &amp;lt;- crossValidate(A, k = 1:15, method = method, reps = 3, seed = 123, perturb_to = &amp;quot;random&amp;quot;, n = n)
+cv2 &amp;lt;- crossValidate(aml, k = 1:15, method = method, reps = 3, seed = 123, perturb_to = &amp;quot;random&amp;quot;, n = n)
+cv3 &amp;lt;- crossValidate(movielens$ratings, k = 1:15, method = method, reps = 3, seed = 123, perturb_to = &amp;quot;random&amp;quot;, n = n)
+cv4 &amp;lt;- crossValidate(hawaiibirds$counts, k = 1:15, method = method, reps = 3, seed = 123, perturb_to = &amp;quot;random&amp;quot;, n = n)
+plot_grid(
+  plot(cv1) + theme(legend.position = &amp;quot;none&amp;quot;) + scale_y_continuous(trans = &amp;quot;log10&amp;quot;),
+  plot(cv2) + theme(legend.position = &amp;quot;none&amp;quot;) + scale_y_continuous(trans = &amp;quot;log10&amp;quot;),
+  plot(cv3) + theme(legend.position = &amp;quot;none&amp;quot;) + scale_y_continuous(trans = &amp;quot;log10&amp;quot;),
+  plot(cv4) + theme(legend.position = &amp;quot;none&amp;quot;) + scale_y_continuous(trans = &amp;quot;log10&amp;quot;),
+  nrow = 2)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;https://zachdebruine.com/post/cross-validation-for-nmf-rank-determination/index.en_files/figure-html/unnamed-chunk-8-1.png&#34; width=&#34;768&#34; style=&#34;display: block; margin: auto auto auto 0;&#34; /&gt;&lt;/p&gt;
+&lt;/div&gt;
+</description>
+    </item>
+    
+    <item>
+      <title>Annotating NMF factors with sample metadata</title>
+      <link>https://zachdebruine.com/post/annotating-nmf-factors-with-sample-metadata/</link>
+      <pubDate>Tue, 12 Oct 2021 00:00:00 +0000</pubDate>
+      <guid>https://zachdebruine.com/post/annotating-nmf-factors-with-sample-metadata/</guid>
+      <description>
+
+
+&lt;div id=&#34;annotating-nmf-factors&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Annotating NMF factors&lt;/h2&gt;
+&lt;p&gt;NMF learns an interpretable low-rank representation of data. However, how do we make sense of the factors in this low-rank latent model? A great way to begin annotating a latent space is to simply map it back to known sample and feature traits.&lt;/p&gt;
+&lt;p&gt;This vignette demonstrates these concepts using an NMF model of bird species communities throughout the Hawaiian islands.&lt;/p&gt;
+&lt;/div&gt;
+&lt;div id=&#34;install-rcppml&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Install RcppML&lt;/h2&gt;
+&lt;p&gt;Install the RcppML R package from CRAN or the development version from GitHub. Also install the accompanying Machine Learning datasets (MLdata) package:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;install.packages(&amp;#39;RcppML&amp;#39;)                     # install CRAN version
+# devtools::install_github(&amp;quot;zdebruine/RcppML&amp;quot;) # compile dev version
+devtools::install_github(&amp;quot;zdebruine/MLdata&amp;quot;)&lt;/code&gt;&lt;/pre&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;library(RcppML)
+library(MLdata)
+library(ggplot2)
+library(cowplot)
+library(viridis)
+library(ggrepel)
+library(uwot)&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;div id=&#34;the-hawaiibirds-dataset&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;The hawaiibirds dataset&lt;/h2&gt;
+&lt;p&gt;The &lt;code&gt;MLdata::hawaiibirds&lt;/code&gt; dataset gives the frequency of bird species in small geographical grids throughout the state of Hawaii.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;data(hawaiibirds)
+hawaiibirds$counts[1:4, 1:4]&lt;/code&gt;&lt;/pre&gt;
+&lt;pre&gt;&lt;code&gt;## 4 x 4 sparse Matrix of class &amp;quot;dgCMatrix&amp;quot;
+##                                grid1      grid2       grid3      grid4
+## Common Myna               0.32432432 0.19230769 0.242753623 0.80208333
+## Black-crowned Night-Heron 0.06756757 0.07692308 0.007246377 0.03819444
+## Black Noddy               .          0.26923077 0.188405797 .         
+## Brown Noddy               .          0.38461538 .           .&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;A separate &lt;code&gt;metadata_h&lt;/code&gt; matrix gives the geographical coordinates and the corresponding island for each grid.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;head(hawaiibirds$metadata_h)&lt;/code&gt;&lt;/pre&gt;
+&lt;pre&gt;&lt;code&gt;##    grid island   lat     lng
+## 1 grid1   Maui 20.87 -156.44
+## 2 grid2   Oahu 21.33 -157.66
+## 3 grid3 Hawaii 19.33 -155.19
+## 4 grid4   Oahu 21.37 -157.94
+## 5 grid5 Hawaii 19.72 -155.11
+## 6 grid6   Maui 20.74 -156.24&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;And a separate &lt;code&gt;metadata_w&lt;/code&gt; matrix gives taxonomic information about each species in the database.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;head(hawaiibirds$metadata_w)&lt;/code&gt;&lt;/pre&gt;
+&lt;pre&gt;&lt;code&gt;##                     species             order
+## 1               Common Myna     Passeriformes
+## 2 Black-crowned Night-Heron    Pelecaniformes
+## 3               Black Noddy   Charadriiformes
+## 4               Brown Noddy   Charadriiformes
+## 5           Bulwer&amp;#39;s Petrel Procellariiformes
+## 6                Sooty Tern   Charadriiformes
+##                                     family       category     status
+## 1                    Sturnidae (Starlings) perching birds introduced
+## 2  Ardeidae (Herons, Egrets, and Bitterns)         waders     native
+## 3     Laridae (Gulls, Terns, and Skimmers)     shorebirds     native
+## 4     Laridae (Gulls, Terns, and Skimmers)     shorebirds     native
+## 5 Procellariidae (Shearwaters and Petrels)       seabirds     native
+## 6     Laridae (Gulls, Terns, and Skimmers)     shorebirds     native&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;div id=&#34;cross-validation-for-rank-determination&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Cross-validation for Rank Determination&lt;/h2&gt;
+&lt;p&gt;We can learn an NMF model to describe linear combinations of species across geographical grids. First we need to choose a rank.&lt;/p&gt;
+&lt;p&gt;The rank of a factorization is a crucial hyperparameter. One way to help decide on a rank is cross-validation. This is made easy using the &lt;code&gt;crossValidate&lt;/code&gt; function. See &lt;code&gt;?crossValidate&lt;/code&gt; for details on methods.&lt;/p&gt;
+&lt;p&gt;For many applications, there is no “optimal” rank. In this case, we do expect some amount of distinct biodiversity across the various islands, but within the islands there will be a continuum of habitat niches confounding rank of the signal. Additionally, there may be a number of “missing” observations where surveys were incomplete, which will confound signal separation.&lt;/p&gt;
+&lt;p&gt;Here we cross-validate across 3 independent replicates and plot the result:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;plot(crossValidate(hawaiibirds$counts, k = c(1:10, 12, 15, 20, 25, 30), reps = 3, verbose = FALSE))&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;https://zachdebruine.com/post/annotating-nmf-factors-with-sample-metadata/index.en_files/figure-html/unnamed-chunk-6-1.png&#34; width=&#34;384&#34; style=&#34;display: block; margin: auto auto auto 0;&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;We’ll choose a rank of &lt;code&gt;k = 10&lt;/code&gt; since this seems to capture much of the signal while giving identifiable factors.&lt;/p&gt;
+&lt;/div&gt;
+&lt;div id=&#34;run-robust-nmf&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Run robust NMF&lt;/h2&gt;
+&lt;p&gt;Let’s generate a high-quality NMF model across 10 random restarts at very low tolerance:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;model &amp;lt;- nmf(hawaiibirds$counts, k = 10, seed = 1:10, tol = 1e-6)&lt;/code&gt;&lt;/pre&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;model&lt;/code&gt;&lt;/pre&gt;
+&lt;pre&gt;&lt;code&gt;## 183 x 1183 x 10 factor model of class &amp;quot;nmf&amp;quot;
+## $ w
+##                                  nmf1        nmf2        nmf3       nmf4 nmf5
+## Common Myna               0.146640316 0.094888073 0.074299917 0.04111043    0
+## Black-crowned Night-Heron 0.006777407 0.004027294 0.005781633 0.00000000    0
+## Black Noddy               0.000000000 0.006376501 0.000000000 0.00000000    0
+## Brown Noddy               0.000000000 0.000000000 0.000000000 0.00000000    0
+## Bulwer&amp;#39;s Petrel           0.000000000 0.000000000 0.000000000 0.00000000    0
+## ...suppressing 178 rows and 5 columns
+## 
+## $ d
+## [1] 1350.6295 1256.2949 1153.2389  911.6537  834.4069
+## ...suppressing 5 values
+## 
+## $ h
+##             grid1        grid2        grid3       grid4        grid5
+## nmf1 0.0009274172 0.0004718018 0.0005553570 0.003512579 0.0006238265
+## nmf2 0.0001676291 0.0002334082 0.0009073722 0.000000000 0.0018705609
+## nmf3 0.0005758524 0.0000000000 0.0000000000 0.000000000 0.0005398256
+## nmf4 0.0000000000 0.0003021981 0.0000000000 0.003822848 0.0000000000
+## nmf5 0.0000000000 0.0000000000 0.0011624112 0.000000000 0.0000000000
+## ...suppressing 5 rows and 1178 columns
+## 
+## $ tol: 8.238107e-07 
+## $ iter: 67 
+## $ runtime: 0.9558601 sec&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;In the &lt;code&gt;w&lt;/code&gt; matrix we have factors describing communities of co-occuring bird species.&lt;/p&gt;
+&lt;p&gt;In the &lt;code&gt;h&lt;/code&gt; matrix we have the association of these bird communities in each surveyed geographical grid.&lt;/p&gt;
+&lt;/div&gt;
+&lt;div id=&#34;geographic-focus-on-nmf-factors&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Geographic focus on NMF factors&lt;/h2&gt;
+&lt;p&gt;What does each NMF factor tell us?&lt;/p&gt;
+&lt;p&gt;The sample embeddings matrix (&lt;code&gt;h&lt;/code&gt;) gives information about the geographical representation of each NMF factor across all grids. We’ll look at just the first four factors:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;plots &amp;lt;- list()
+for(i in 1:4){
+  df &amp;lt;- data.frame(
+    &amp;quot;lat&amp;quot; = hawaiibirds$metadata_h$lat,
+    &amp;quot;lng&amp;quot; = hawaiibirds$metadata_h$lng,
+    &amp;quot;nmf_factor&amp;quot; = model$h[i, ])
+  plots[[i]] &amp;lt;- ggplot(df, aes(x = lng, y = lat, color = nmf_factor)) +
+    geom_point() +
+    scale_color_viridis(option = &amp;quot;B&amp;quot;) +
+    theme_void() +
+    theme(legend.position = &amp;quot;none&amp;quot;, plot.title = element_text(hjust = 0.5)) + 
+    ggtitle(paste0(&amp;quot;Factor &amp;quot;, i))
+}
+plot_grid(plotlist = plots, nrow = 2)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;https://zachdebruine.com/post/annotating-nmf-factors-with-sample-metadata/index.en_files/figure-html/unnamed-chunk-9-1.png&#34; width=&#34;384&#34; style=&#34;display: block; margin: auto auto auto 0;&#34; /&gt;&lt;/p&gt;
+&lt;/div&gt;
+&lt;div id=&#34;metadata-enrichment-in-factors&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Metadata enrichment in factors&lt;/h2&gt;
+&lt;p&gt;Factor 2 is localized largely to the island of Hawaii, factor 3 to the island of Kauai, and factor 4 to Oahu.&lt;/p&gt;
+&lt;p&gt;Quantitatively, the &lt;code&gt;summary&lt;/code&gt; method for the &lt;code&gt;nmf&lt;/code&gt; S3 class makes it easy to annotate factors using metadata about samples or features. See &lt;code&gt;?summary.nmf&lt;/code&gt; for info.&lt;/p&gt;
+&lt;p&gt;In this case, we will use &lt;code&gt;summary&lt;/code&gt; to map factor enrichment in grids corresponding to each Hawaiian island, and species enrichment corresponding to each category.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;plot(summary(model, group_by = hawaiibirds$metadata_h$island, stat = &amp;quot;sum&amp;quot;))&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;https://zachdebruine.com/post/annotating-nmf-factors-with-sample-metadata/index.en_files/figure-html/unnamed-chunk-10-1.png&#34; width=&#34;384&#34; style=&#34;display: block; margin: auto auto auto 0;&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;In general, grids separate based on the island to which they belong – consistent with the expectation that islands contain distinct species communities.&lt;/p&gt;
+&lt;p&gt;Notice how several factors explain variation within the big island, “Hawaii”, consistent with the objective of NMF and the biological diversity within that island.&lt;/p&gt;
+&lt;p&gt;Due to our normalization method (&lt;code&gt;sum&lt;/code&gt;) very small islands with minor contribution to the model objective (i.e. Puuwai) are hardly represented.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;plot(summary(model, group_by = hawaiibirds$metadata_w$category, stat = &amp;quot;mean&amp;quot;))&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;https://zachdebruine.com/post/annotating-nmf-factors-with-sample-metadata/index.en_files/figure-html/unnamed-chunk-11-1.png&#34; width=&#34;384&#34; style=&#34;display: block; margin: auto auto auto 0;&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;Clearly, there is the greatest signal complexity among “perching birds”. &lt;code&gt;nmf10&lt;/code&gt; is describing “seabirds” while &lt;code&gt;nmf9&lt;/code&gt; is capturing much of the “non-perching birds” information.&lt;/p&gt;
+&lt;/div&gt;
+&lt;div id=&#34;nmf-biplots&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;NMF biplots&lt;/h2&gt;
+&lt;p&gt;Compare species composition in two factors that are both primarily restricted to the island of Hawaii, factors 7 and 8. The &lt;code&gt;biplot&lt;/code&gt; S3 method for &lt;code&gt;nmf&lt;/code&gt; makes this easy:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;biplot(model, factors = c(7, 8), matrix = &amp;quot;w&amp;quot;, group_by = hawaiibirds$metadata_w$category) + 
+  scale_y_continuous(trans = &amp;quot;sqrt&amp;quot;) + 
+  scale_x_continuous(trans = &amp;quot;sqrt&amp;quot;) +
+  geom_text_repel(size = 2.5, seed = 123, max.overlaps = 15)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;https://zachdebruine.com/post/annotating-nmf-factors-with-sample-metadata/index.en_files/figure-html/unnamed-chunk-12-1.png&#34; width=&#34;528&#34; style=&#34;display: block; margin: auto auto auto 0;&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;Factor 7 describes a wet rainforest community while Factor 8 describes dry rainforest/shrubland communities. Both factors are overwhelmingly focused on “perching birds”.&lt;/p&gt;
+&lt;/div&gt;
+&lt;div id=&#34;umap-on-nmf-embeddings&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;UMAP on NMF embeddings&lt;/h2&gt;
+&lt;p&gt;We might also be interested in visualizing how factors in &lt;span class=&#34;math inline&#34;&gt;\(w\)&lt;/span&gt; capture similarities among bird species using UMAP.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;set.seed(123)
+umap &amp;lt;- data.frame(uwot::umap(model$w))
+umap$taxon &amp;lt;- hawaiibirds$metadata_w$category
+umap$status &amp;lt;- hawaiibirds$metadata_w$status
+plot_grid(
+  ggplot(umap, aes(x = umap[,1], y = umap[,2], color = taxon)) +
+    geom_point() + theme_void(),
+  ggplot(umap, aes(x = umap[,1], y = umap[,2], color = status)) +
+    geom_point() + theme_void(),
+  nrow = 1
+)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;https://zachdebruine.com/post/annotating-nmf-factors-with-sample-metadata/index.en_files/figure-html/unnamed-chunk-13-1.png&#34; width=&#34;768&#34; style=&#34;display: block; margin: auto auto auto 0;&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;Species are classified based on habitat niche and taxonomic membership. Notice “seabirds” on the left, “perching birds” in the center mixed with “non-perching birds”, and a mix of “waders”, “waterfowl”, and “shorebirds” in the bottom right. There are also two distinct groups of “shorebirds” and “waterfowl”, consistent with distinct inland and shoreline communities.&lt;/p&gt;
+&lt;p&gt;Hawaii is extinction kingdom. For instance, more than 20 species of endemic honeycreeper have gone extinct in the past two centuries due to the establishment of introduced species and habitat devastation. Few remain. In the UMAP plot above on the right, we can observe that introduced species dominate habitat niches occupied by native perching and non-perching birds, a problem underlying historic and ongoing mass extinction events.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;set.seed(123)
+umap &amp;lt;- data.frame(uwot::umap(t(model$h)))
+umap$group &amp;lt;- hawaiibirds$metadata_h$island
+ggplot(umap, aes(x = umap[,1], y = umap[,2], color = group)) +
+  geom_point() + theme_void()&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;https://zachdebruine.com/post/annotating-nmf-factors-with-sample-metadata/index.en_files/figure-html/unnamed-chunk-14-1.png&#34; width=&#34;384&#34; style=&#34;display: block; margin: auto auto auto 0;&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;Islands are also well-defined by the NMF model.&lt;/p&gt;
+&lt;/div&gt;
+&lt;div id=&#34;defining-the-palila-species-niche&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Defining the “Palila” species niche&lt;/h2&gt;
+&lt;p&gt;The &lt;a href=&#34;https://ebird.org/media/catalog?taxonCode=palila&amp;amp;mediaType=p&amp;amp;sort=rating_rank_desc&amp;amp;q=Palila%20-%20Loxioides%20bailleui&#34;&gt;Palila&lt;/a&gt; is a highly endangered species that survives in small numbers on the eastern slopes of Mauna Kea on the dry island, in a shrubby dry “rainforest” biome. This biome is unique on the island of Hawaii.&lt;/p&gt;
+&lt;p&gt;What species coexist with the Palila?&lt;/p&gt;
+&lt;p&gt;Let’s find the highest factorization resolution at which a single factor describes the distribution of the Palila.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;palila &amp;lt;- list()
+for(rank in 1:20)
+  palila[[rank]] &amp;lt;- data.frame(
+    &amp;quot;value&amp;quot; = nmf(hawaiibirds$counts, k = rank, seed = 123, v = F)$w[&amp;quot;Palila&amp;quot;, ],
+    &amp;quot;rank&amp;quot; = rep(rank, rank)
+  )
+palila &amp;lt;- do.call(rbind, palila)
+ggplot(palila, aes(x = rank, y = value, color = factor(rank))) + geom_jitter(width = 0.1) + theme_classic() +
+  scale_color_manual(values = rep(c(&amp;quot;#F8766D&amp;quot;, &amp;quot;#00BDD0&amp;quot;), 10)) + labs(&amp;quot;Palila loading in factor&amp;quot;) + theme(legend.position = &amp;quot;none&amp;quot;)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;https://zachdebruine.com/post/annotating-nmf-factors-with-sample-metadata/index.en_files/figure-html/unnamed-chunk-15-1.png&#34; width=&#34;384&#34; style=&#34;display: block; margin: auto auto auto 0;&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;The model with a rank of 15 contains a factor in which the Palila is both important and specific.&lt;/p&gt;
+&lt;p&gt;Let’s have a look at the species composition in factor 15, specifically identifying which species are introduced and which are native:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;model &amp;lt;- nmf(hawaiibirds$counts, k = 15, seed = 123, v = F)
+df &amp;lt;- data.frame(&amp;quot;value&amp;quot; = model$w[, which.max(model$w[&amp;quot;Palila&amp;quot;, ])])
+df$status &amp;lt;- hawaiibirds$metadata_w$status
+df &amp;lt;- df[order(-df$value), ]
+df &amp;lt;- df[df$value &amp;gt; 0.001, ]
+df&lt;/code&gt;&lt;/pre&gt;
+&lt;pre&gt;&lt;code&gt;##                             value     status
+## Hawaii Amakihi        0.353110902     native
+## Warbling White-eye    0.188662129     native
+## House Finch           0.182132197 introduced
+## Erckel&amp;#39;s Francolin    0.066866618 introduced
+## Yellow-fronted Canary 0.045745828 introduced
+## California Quail      0.043372489     native
+## Palila                0.038791926     native
+## Eurasian Skylark      0.032193106 introduced
+## Hawaii Elepaio        0.028948444     native
+## Red-billed Leiothrix  0.008899639 introduced
+## Chukar                0.004825709 introduced
+## Indian Peafowl        0.003265103     native
+## Chinese Hwamei        0.002520935 introduced&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;The diet of the Palilla is largely seeds from the “mamame” tree, but also naio berries and mamame flowers, buds, and young leaves. What introduced perching birds may be competing with the Palila for these resources?&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;perching_birds &amp;lt;- hawaiibirds$metadata_w$species[hawaiibirds$metadata_w$category == &amp;quot;perching birds&amp;quot;]
+df[which(rownames(df) %in% perching_birds &amp;amp; df$status == &amp;quot;introduced&amp;quot;), ]&lt;/code&gt;&lt;/pre&gt;
+&lt;pre&gt;&lt;code&gt;##                             value     status
+## House Finch           0.182132197 introduced
+## Yellow-fronted Canary 0.045745828 introduced
+## Eurasian Skylark      0.032193106 introduced
+## Red-billed Leiothrix  0.008899639 introduced
+## Chinese Hwamei        0.002520935 introduced&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;The “House Finch” and “Yellow-fronted Canary” seem to be the most significant competitors in the Palila habitat niche.&lt;/p&gt;
+&lt;/div&gt;
+</description>
+    </item>
+    
+    <item>
+      <title>Integrating Heterogenous Samples with NMF</title>
+      <link>https://zachdebruine.com/post/integrating-with-nmf/</link>
+      <pubDate>Tue, 12 Oct 2021 00:00:00 +0000</pubDate>
+      <guid>https://zachdebruine.com/post/integrating-with-nmf/</guid>
+      <description>
+
+
+&lt;div id=&#34;nmf-for-source-separation&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;NMF for source separation&lt;/h2&gt;
+&lt;p&gt;One of the many applications of NMF is &lt;a href=&#34;https://en.wikipedia.org/wiki/Signal_separation&#34;&gt;source separation&lt;/a&gt;, aka blind signal separation, where a mixture of signals are resolved in a factor model. Different samples will contain different signals, some unique, and some shared. The goal might be to visualize samples based on signals they share, or to identify discriminating signals.&lt;/p&gt;
+&lt;/div&gt;
+&lt;div id=&#34;integrative-nmf&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Integrative NMF?&lt;/h2&gt;
+&lt;p&gt;Integrative NMF (iNMF) has been proposed for source separation and integration of heterogenous datasets (see &lt;a href=&#34;https://github.com/welch-lab/liger&#34;&gt;LIGER&lt;/a&gt;). However, iNMF requires a regularization hyperparameter to enforce integration, and fitting is inherently slow.&lt;/p&gt;
+&lt;p&gt;Instead, we can simply run NMF on all signals and then annotate what factors are specific to metadata of interest.&lt;/p&gt;
+&lt;/div&gt;
+&lt;div id=&#34;cancer-vs.-healthy-cell-signatures&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Cancer vs. healthy cell signatures&lt;/h2&gt;
+&lt;p&gt;Classification of cancer cell-of-origin is a great example of source separation. Here, the challenge is to tease out signatures shared by cancer and healthy cell types to discover the cell type from which the cancer originated.&lt;/p&gt;
+&lt;p&gt;We’ll use the &lt;code&gt;aml&lt;/code&gt; dataset from the &lt;code&gt;MLdata&lt;/code&gt; package:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;devtools::install_github(&amp;quot;zdebruine/MLdata&amp;quot;)
+devtools::install_RcppML(&amp;quot;zdebruine/RcppML&amp;quot;)&lt;/code&gt;&lt;/pre&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;library(RcppML)
+library(MLdata)
+library(ggplot2)
+library(cowplot)
+library(umap)
+data(aml)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;The &lt;code&gt;MLdata::aml&lt;/code&gt; dataset contains samples from 123 patients with Acute Myelogenous Leukemia (AML) and 5 samples each for putative cells of origin (GMP, LMPP, or MEP cells) from healthy patients. Each sample contains information on ~800 differentially methylated regions (DMRs), a measure of gene expression signatures.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;table(colnames(aml))&lt;/code&gt;&lt;/pre&gt;
+&lt;pre&gt;&lt;code&gt;## 
+## AML sample        GMP       LMPP        MEP 
+##        123          5          5          5&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Since we have three cell types and cancer, we’ll choose a low factorization rank (&lt;code&gt;k = 5&lt;/code&gt;). We’ll fit to machine-tolerances and input ten random seeds so that &lt;code&gt;RcppML::nmf&lt;/code&gt; runs factorizations from ten unique random initializations, and returns the best model of the ten:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;nmf_model &amp;lt;- RcppML::nmf(aml, k = 5, tol = 1e-10, maxit = 1000, seed = 1:10, verbose = F)&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;div id=&#34;annotating-signal-sources&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Annotating signal sources&lt;/h2&gt;
+&lt;p&gt;We can see which sample types are represented in each NMF factor:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;plot(summary(nmf_model, group_by = colnames(aml), stat = &amp;quot;mean&amp;quot;))&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;https://zachdebruine.com/post/integrating-with-nmf/index.en_files/figure-html/summary_plot-1.png&#34; width=&#34;384&#34; style=&#34;display: block; margin: auto auto auto 0;&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;Notice how factor 3 almost exclusively describes methylation signal in healthy cells.&lt;/p&gt;
+&lt;p&gt;Let’s plot factor 3 vs. factor 5:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;biplot(nmf_model, factors = c(3, 5), matrix = &amp;quot;h&amp;quot;, group_by = colnames(aml))&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;https://zachdebruine.com/post/integrating-with-nmf/index.en_files/figure-html/biplot-1.png&#34; width=&#34;384&#34; style=&#34;display: block; margin: auto auto auto 0;&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;Clearly if we want to “integrate” cancer and healthy cells for the purposes of classifying cell-of-origin, we do not want to be including factor 3 in that analysis.&lt;/p&gt;
+&lt;/div&gt;
+&lt;div id=&#34;umap-on-the-nmf-embedding&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;UMAP on the NMF embedding&lt;/h2&gt;
+&lt;p&gt;Let’s learn a UMAP embedding of all samples on NMF coordinates using the full NMF model.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;plot_umap &amp;lt;- function(nmf_model){
+  set.seed(123)
+  u &amp;lt;- uwot::umap(t(nmf_model$h), n_neighbors = 10, metric = &amp;quot;cosine&amp;quot;, min_dist = 0.3, spread = 1)
+  df &amp;lt;- data.frame(&amp;quot;umap1&amp;quot; = u[, 1], &amp;quot;umap2&amp;quot; = u[, 2], &amp;quot;group&amp;quot; = colnames(nmf_model$h))
+  ggplot(df, aes(x = umap1, y = umap2, color = group)) + geom_point() + theme_void()
+}
+
+plot_umap(nmf_model)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;https://zachdebruine.com/post/integrating-with-nmf/index.en_files/figure-html/umap_all-1.png&#34; width=&#34;288&#34; style=&#34;display: block; margin: auto auto auto 0;&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;Clearly there are fundamental differences between cancer and healthy cells.&lt;/p&gt;
+&lt;/div&gt;
+&lt;div id=&#34;integrating-by-source-separation&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Integrating by source separation&lt;/h2&gt;
+&lt;p&gt;Let’s do the same as we did above, but now excluding factor 3:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;plot_umap(nmf_model[-3])&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;https://zachdebruine.com/post/integrating-with-nmf/index.en_files/figure-html/umap_integrated-1.png&#34; width=&#34;288&#34; style=&#34;display: block; margin: auto auto auto 0;&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;Bingo! We are able to classify cancer cells based on healthy cell-of-origin!&lt;/p&gt;
+&lt;p&gt;In conclusion, we were able to integrate cancer and healthy cell methylation signatures by finding factors describing variation they shared in common.&lt;/p&gt;
+&lt;/div&gt;
+</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>https://zachdebruine.com/admin/config.yml</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      <guid>https://zachdebruine.com/admin/config.yml</guid>
+      <description></description>
+    </item>
+    
+  </channel>
+</rss>

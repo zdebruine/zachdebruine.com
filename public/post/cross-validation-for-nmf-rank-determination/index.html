@@ -1,0 +1,1159 @@
+<!DOCTYPE html><html lang="en-us" >
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  
+  
+  
+    <meta name="generator" content="Wowchemy 5.3.0 for Hugo" />
+  
+
+  
+
+  
+  
+  
+  
+  
+    
+    
+    
+  
+  
+
+  <meta name="author" content="Zach DeBruine" />
+
+  
+  
+  
+    
+  
+  <meta name="description" content="In this post I review four distinctly different methods for cross-validation of NMF, each with strengths and weaknesses for different applications, and discuss how to use these methods effectively." />
+
+  
+  <link rel="alternate" hreflang="en-us" href="https://zachdebruine.com/post/cross-validation-for-nmf-rank-determination/" />
+
+  
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+  
+  
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  
+
+  
+  
+  
+    <meta name="theme-color" content="#1565c0" />
+  
+
+  
+  
+
+  
+
+  <link rel="stylesheet" href="/css/vendor-bundle.min.f1ecf783c14edc00c9320c205831ad8e.css" media="print" onload="this.media='all'">
+
+  
+  
+  
+    
+    
+      <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/academicons/1.9.0/css/academicons.min.css" integrity="sha512-W4yqoT1+8NLkinBLBZko+dFB2ZbHsYLDdr50VElllRcNt2Q4/GSs6u71UHKxB7S6JEMCp5Ve4xjh3eGQl/HRvg==" crossorigin="anonymous" media="print" onload="this.media='all'">
+    
+
+    
+    
+    
+    
+      
+      
+    
+    
+    
+
+    
+    
+    
+      
+    
+    
+      
+      
+        
+          <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.2.0/styles/github.min.css" crossorigin="anonymous" title="hl-light" media="print" onload="this.media='all'">
+          <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.2.0/styles/dracula.min.css" crossorigin="anonymous" title="hl-dark" media="print" onload="this.media='all'" disabled>
+        
+      
+    
+
+    
+    
+    
+      <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/leaflet.min.css" integrity="sha512-1xoFisiGdy9nvho8EgXuXvnpR5GAMSjFwp40gSRE3NwdUdIMIKuPa7bqoUhLD0O/5tPNhteAsE5XyyMi5reQVA==" crossorigin="anonymous" media="print" onload="this.media='all'">
+    
+
+    
+
+    
+    
+      
+      
+
+      
+      
+
+      
+    
+      
+      
+
+      
+      
+
+      
+    
+      
+      
+
+      
+      
+
+      
+    
+      
+      
+
+      
+      
+
+      
+    
+      
+      
+
+      
+      
+
+      
+    
+      
+      
+
+      
+      
+
+      
+    
+      
+      
+
+      
+      
+
+      
+    
+      
+      
+
+      
+      
+
+      
+    
+      
+      
+
+      
+      
+
+      
+    
+      
+      
+
+      
+      
+
+      
+    
+      
+      
+
+      
+      
+
+      
+    
+      
+      
+
+      
+      
+
+      
+    
+      
+      
+
+      
+      
+        
+      
+
+      
+    
+      
+      
+
+      
+      
+
+      
+    
+      
+      
+
+      
+      
+
+      
+    
+  
+
+  
+  
+  
+    
+      
+      <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&family=Roboto+Mono&family=Roboto:wght@400;700&display=swap">
+      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&family=Roboto+Mono&family=Roboto:wght@400;700&display=swap" media="print" onload="this.media='all'">
+    
+  
+
+  
+  
+  
+  
+  
+  <link rel="stylesheet" href="/css/wowchemy.fb09bd065933df494dfc11df8e3c78fa.css" />
+
+  
+
+
+
+  
+
+  
+
+  
+
+
+
+
+  
+  
+  
+
+  
+
+  
+    <link rel="manifest" href="/manifest.webmanifest" />
+  
+
+  <link rel="icon" type="image/png" href="/media/icon_hu3a1a9d362c9f3f4d7273828c49d8e14c_75812_32x32_fill_lanczos_center_3.png" />
+  <link rel="apple-touch-icon" type="image/png" href="/media/icon_hu3a1a9d362c9f3f4d7273828c49d8e14c_75812_180x180_fill_lanczos_center_3.png" />
+
+  <link rel="canonical" href="https://zachdebruine.com/post/cross-validation-for-nmf-rank-determination/" />
+
+  
+  
+  
+  
+  
+  
+  
+  
+    
+    
+  
+  
+  <meta property="twitter:card" content="summary" />
+  
+  <meta property="og:site_name" content="Zach DeBruine" />
+  <meta property="og:url" content="https://zachdebruine.com/post/cross-validation-for-nmf-rank-determination/" />
+  <meta property="og:title" content="Cross-validation for NMF rank determination | Zach DeBruine" />
+  <meta property="og:description" content="In this post I review four distinctly different methods for cross-validation of NMF, each with strengths and weaknesses for different applications, and discuss how to use these methods effectively." /><meta property="og:image" content="https://zachdebruine.com/media/icon_hu3a1a9d362c9f3f4d7273828c49d8e14c_75812_512x512_fill_lanczos_center_3.png" />
+    <meta property="twitter:image" content="https://zachdebruine.com/media/icon_hu3a1a9d362c9f3f4d7273828c49d8e14c_75812_512x512_fill_lanczos_center_3.png" /><meta property="og:locale" content="en-us" />
+  
+    
+      <meta
+        property="article:published_time"
+        content="2021-10-17T00:00:00&#43;00:00"
+      />
+    
+    <meta property="article:modified_time" content="2021-10-17T00:00:00&#43;00:00">
+  
+
+  
+
+
+    
+
+
+
+
+
+
+  
+
+
+
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "mainEntityOfPage": {
+    "@type": "WebPage",
+    "@id": "https://zachdebruine.com/post/cross-validation-for-nmf-rank-determination/"
+  },
+  "headline": "Cross-validation for NMF rank determination",
+  
+  "datePublished": "2021-10-17T00:00:00Z",
+  "dateModified": "2021-10-17T00:00:00Z",
+  
+  "author": {
+    "@type": "Person",
+    "name": "Zach DeBruine"
+  },
+  
+  "publisher": {
+    "@type": "Organization",
+    "name": "Zach DeBruine",
+    "logo": {
+      "@type": "ImageObject",
+      "url": "https://zachdebruine.com/media/icon_hu3a1a9d362c9f3f4d7273828c49d8e14c_75812_192x192_fill_lanczos_center_3.png"
+    }
+  },
+  "description": "In this post I review four distinctly different methods for cross-validation of NMF, each with strengths and weaknesses for different applications, and discuss how to use these methods effectively."
+}
+</script>
+
+  
+
+  
+
+  
+
+  
+
+
+
+
+
+  <title>Cross-validation for NMF rank determination | Zach DeBruine</title>
+</head>
+
+
+<body id="top" data-spy="scroll" data-offset="70" data-target="#TableOfContents" class="page-wrapper   " data-wc-page-id="e7e903eaf2ef8d1e3bb5e7071111c38f" >
+
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  <script src="/js/wowchemy-init.min.7f3e7639f4c7f2a2cf83b68ea7de7f08.js"></script>
+
+  
+
+
+<aside class="search-modal" id="search">
+  <div class="container">
+    <section class="search-header">
+
+      <div class="row no-gutters justify-content-between mb-3">
+        <div class="col-6">
+          <h1>Search</h1>
+        </div>
+        <div class="col-6 col-search-close">
+          <a class="js-search" href="#" aria-label="Close"><i class="fas fa-times-circle text-muted" aria-hidden="true"></i></a>
+        </div>
+      </div>
+
+      <div id="search-box">
+        
+        <input name="q" id="search-query" placeholder="Search..." autocapitalize="off"
+        autocomplete="off" autocorrect="off" spellcheck="false" type="search" class="form-control"
+        aria-label="Search...">
+        
+      </div>
+
+      
+      
+
+      
+
+    </section>
+    <section class="section-search-results">
+
+      <div id="search-hits">
+        
+      </div>
+
+    </section>
+  </div>
+</aside>
+
+
+
+  <div class="page-header">
+    
+
+
+
+
+
+
+
+
+
+
+
+
+<nav class="navbar navbar-expand-lg navbar-light compensate-for-scrollbar" id="navbar-main">
+  <div class="container-xl">
+
+    
+    <div class="d-none d-lg-inline-flex">
+      <a class="navbar-brand" href="/">Zach DeBruine</a>
+    </div>
+    
+
+    
+    <button type="button" class="navbar-toggler" data-toggle="collapse"
+            data-target="#navbar-content" aria-controls="navbar-content" aria-expanded="false" aria-label="Toggle navigation">
+    <span><i class="fas fa-bars"></i></span>
+    </button>
+    
+
+    
+    <div class="navbar-brand-mobile-wrapper d-inline-flex d-lg-none">
+      <a class="navbar-brand" href="/">Zach DeBruine</a>
+    </div>
+    
+
+    
+    
+    <div class="navbar-collapse main-menu-item collapse justify-content-start" id="navbar-content">
+
+      
+      <ul class="navbar-nav d-md-inline-flex">
+        
+
+        
+
+        
+        
+        
+          
+        
+
+        
+
+        
+        
+        
+        
+
+        
+          
+            
+            
+          
+          
+            
+            
+            
+              
+            
+            
+          
+        
+
+        <li class="nav-item">
+          <a class="nav-link " href="/#posts"><span>Posts</span></a>
+        </li>
+
+        
+        
+
+        
+
+        
+        
+        
+          
+        
+
+        
+
+        
+        
+        
+        
+
+        
+          
+            
+            
+          
+          
+            
+            
+            
+              
+            
+            
+          
+        
+
+        <li class="nav-item">
+          <a class="nav-link " href="/#about"><span>About</span></a>
+        </li>
+
+        
+        
+
+      
+
+        
+      </ul>
+    </div>
+
+    <ul class="nav-icons navbar-nav flex-row ml-auto d-flex pl-md-2">
+
+      
+      
+        
+          
+          <li class="nav-item d-none d-lg-inline-flex">
+            <a class="nav-link" href="/"  aria-label="">
+              <i class="fas fa-" aria-hidden="true"></i>
+            </a>
+          </li>
+        
+      
+
+      
+      
+      <li class="nav-item">
+        <a class="nav-link js-search" href="#" aria-label="Search"><i class="fas fa-search" aria-hidden="true"></i></a>
+      </li>
+      
+
+      
+      
+
+      
+      
+
+    </ul>
+
+  </div>
+</nav>
+
+
+  </div>
+
+  <div class="page-body">
+    <article class="article">
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+  
+  
+<div class="article-container pt-3">
+  <h1>Cross-validation for NMF rank determination</h1>
+
+  
+  <p class="page-subtitle">Four methods for cross-validation of non-negative matrix factorizations</p>
+  
+
+  
+    
+
+
+<div class="article-metadata">
+
+  
+  
+
+  
+  <span class="article-date">
+    
+    
+      
+    
+    Oct 17, 2021
+  </span>
+  
+
+  
+
+  
+
+  
+  
+  
+  
+  
+  
+
+  
+  
+  <span class="middot-divider"></span>
+  <span class="article-categories">
+    <i class="fas fa-folder mr-1"></i><a href="/category/nmf/">NMF</a>, <a href="/category/methods/">methods</a></span>
+  
+
+</div>
+
+    
+
+
+
+
+
+  
+</div>
+
+
+
+  <div class="article-container">
+
+    <div class="article-style">
+      
+
+
+<div id="cross-validation-for-nmf" class="section level2">
+<h2>Cross-Validation for NMF</h2>
+<p>Rank is the most important hyperparameter in NMF. Finding that “sweet spot” rank can make the difference between learning a useful model that captures meaningful signal (but not noise) or learning a garbage model that misses good signal or focuses too much on useless noise.</p>
+<p>Alex Williams has posted a great introduction to cross-validation for NMF on his <a href="http://alexhwilliams.info/itsneuronalblog/2018/02/26/crossval/">blog</a>. His review of the first two methods is particularly intuitive. However, the third method is both theoretically questionable and poor in practice.</p>
+<p>There are three “unsupervised” cross-validation methods for NMF which I have found to be useful:</p>
+<ul>
+<li><strong>Bi-cross-validation</strong>, proposed by <a href="https://projecteuclid.org/journals/annals-of-applied-statistics/volume-3/issue-2/Bi-cross-validation-of-the-SVD-and-the/10.1214/08-AOAS227.full">Perry</a> and explained simply by <a href="http://alexhwilliams.info/itsneuronalblog/2018/02/26/crossval/">Williams</a>. The “Bi-” in “Bi-cross-validation” means that the model is trained on a block of randomly selected samples and features and evaluated on a non-intersecting block of samples and features. Thus, no samples or features in the test set are included in the training set. If the test and training sets contain samples in common, or features in common, NMF gets to “cheat” in training and directly infer patterns of regulation, and thus basic subsample-cross-validation with NMF does not work.</li>
+<li><strong>Imputation</strong>, described nicely by <a href="https://bmcbioinformatics.biomedcentral.com/articles/10.1186/s12859-019-3312-5">Lin</a> and also reviewed in this StackExchange post by <a href="https://stats.stackexchange.com/questions/111205/how-to-choose-an-optimal-number-of-latent-factors-in-non-negative-matrix-factori">amoeba</a>. Here, a small fraction of values (i.e. 5%) are “masked” and considered as missing during factorization, and the mean squared error of the imputed values is calculated after model training.</li>
+<li><strong>Robustness</strong> is simply the cosine similarity of matched factors in independent models trained on non-overlapping sample sets. The premise is that noise capture will result in low similarity, while efficient signal capture will result in high similarity. Furthermore, approximations which are too low-rank will not classify signals in the same manner, leading to poor factor matching.</li>
+</ul>
+</div>
+<div id="takeaways" class="section level2">
+<h2>Takeaways</h2>
+<ul>
+<li>The <code>project</code> method (bi-cross-validation) is useful for well-conditioned signal.</li>
+<li>The <code>robust</code> method (similarity of independent factorizations) is generally the most informative for noisy data possibly suffering from signal dropout.</li>
+<li>The <code>imputation</code> method is the slowest of the three, but generally the most sensitive.</li>
+</ul>
+</div>
+<div id="install-rcppml" class="section level2">
+<h2>Install RcppML</h2>
+<p>Install the development version of RcppML:</p>
+<pre class="r"><code>devtools::install_github(&quot;zdebruine/RcppML&quot;)</code></pre>
+<pre class="r"><code>library(RcppML)
+library(ggplot2)
+library(cowplot)
+library(umap)
+library(irlba)</code></pre>
+</div>
+<div id="simulated-data" class="section level2">
+<h2>Simulated data</h2>
+<p>Simulated data is useful for demonstrating the utility of methods in response to adversarial perturbations such as noise or dropout.</p>
+<p>We will first explore cross-validation using two simulated datasets generated with <code>simulateNMF</code>:</p>
+<ol style="list-style-type: decimal">
+<li><code>data_clean</code> will have no noise or signal dropout</li>
+<li><code>data_dirty</code> contains the same signal as <code>data_clean</code>, but with a good amount of noise and dropout.</li>
+</ol>
+<pre class="r"><code>data_clean &lt;- simulateNMF(nrow = 200, ncol = 200, k = 5, noise = 0, dropout = 0, seed = 123)
+data_dirty &lt;- simulateNMF(nrow = 200, ncol = 200, k = 5, noise = 0.5, dropout = 0.5, seed = 123)</code></pre>
+<p>Notice how <code>data_clean</code> contains only 5 non-zero singular values, while <code>data_dirty</code> does not:</p>
+<p><img src="https://zachdebruine.com/post/cross-validation-for-nmf-rank-determination/index.en_files/figure-html/unnamed-chunk-2-1.png" width="240" style="display: block; margin: auto auto auto 0;" /></p>
+<p>We can use <code>RcppML::crossValidate</code> to determine the rank of each dataset. The default method uses “bi-cross-validation”. See <code>?crossValidate</code> for details.</p>
+<pre class="r"><code>cv_clean &lt;- crossValidate(data_clean, k = 1:10, method = &quot;predict&quot;, reps = 3, seed = 123)
+cv_dirty &lt;- crossValidate(data_dirty, k = 1:10, method = &quot;predict&quot;, reps = 3, seed = 123)
+plot_grid(
+  plot(cv_clean) + ggtitle(&quot;bi-cross-validation on\nclean dataset&quot;),
+  plot(cv_dirty) + ggtitle(&quot;bi-cross-validation on\ndirty dataset&quot;), nrow = 1)</code></pre>
+<p><img src="https://zachdebruine.com/post/cross-validation-for-nmf-rank-determination/index.en_files/figure-html/unnamed-chunk-3-1.png" width="576" style="display: block; margin: auto auto auto 0;" /></p>
+<p><code>crossValidate</code> also supports another method which compares robustness of two factorizations on independent sample subsets.</p>
+<pre class="r"><code>cv_clean &lt;- crossValidate(data_clean, k = 1:10, method = &quot;robust&quot;, reps = 3, seed = 123)
+cv_dirty &lt;- crossValidate(data_dirty, k = 1:10, method = &quot;robust&quot;, reps = 3, seed = 123)
+plot_grid(
+  plot(cv_clean) + ggtitle(&quot;robust cross-validation on\nclean dataset&quot;),
+  plot(cv_dirty) + ggtitle(&quot;robust cross-validation on\ndirty dataset&quot;), nrow = 1)</code></pre>
+<p><img src="https://zachdebruine.com/post/cross-validation-for-nmf-rank-determination/index.en_files/figure-html/unnamed-chunk-4-1.png" width="576" style="display: block; margin: auto auto auto 0;" /></p>
+<p>This second method does better on ill-conditioned data because it measures the robustness between independent factorizations.</p>
+<p>Finally, we can use the <code>impute</code> method:</p>
+<pre class="r"><code>cv_clean &lt;- crossValidate(data_clean, k = 1:10, method = &quot;impute&quot;, reps = 3, seed = 123)
+cv_dirty &lt;- crossValidate(data_dirty, k = 1:10, method = &quot;impute&quot;, reps = 3, seed = 123)
+plot_grid(
+  plot(cv_clean) + ggtitle(&quot;impute cross-validation on\nclean dataset&quot;) + scale_y_continuous(trans = &quot;log10&quot;),
+  plot(cv_dirty) + ggtitle(&quot;impute cross-validation on\ndirty dataset&quot;) + scale_y_continuous(trans = &quot;log10&quot;), nrow = 1)</code></pre>
+<p><img src="https://zachdebruine.com/post/cross-validation-for-nmf-rank-determination/index.en_files/figure-html/unnamed-chunk-5-1.png" width="576" style="display: block; margin: auto auto auto 0;" /></p>
+<p>For real datasets, it is important to experiment with both cross-validation methods and to explore multi-resolution analysis or other objectives where appropriate.</p>
+<p>Let’s take a look at a real dataset:</p>
+</div>
+<div id="finding-the-rank-of-the-hawaiibirds-dataset" class="section level2">
+<h2>Finding the rank of the <code>hawaiibirds</code> dataset</h2>
+<pre class="r"><code>data(hawaiibirds)
+A &lt;- hawaiibirds$counts
+cv_predict &lt;- crossValidate(A, k = 1:20, method = &quot;predict&quot;, reps = 3, seed = 123)
+cv_robust &lt;- crossValidate(A, k = 1:20, method = &quot;robust&quot;, reps = 3, seed = 123)
+cv_impute &lt;- crossValidate(A, k = 1:20, method = &quot;impute&quot;, reps = 3, seed = 123)
+plot_grid(
+  plot(cv_predict) + ggtitle(&quot;method = &#39;predict&#39;&quot;) + theme(legend.position = &quot;none&quot;),
+  plot(cv_robust) + ggtitle(&quot;method = &#39;robust&#39;&quot;) + theme(legend.position = &quot;none&quot;),
+  plot(cv_impute) + ggtitle(&quot;method = &#39;impute&#39;&quot;) + scale_y_continuous(trans = &quot;log10&quot;) + theme(legend.position = &quot;none&quot;),
+  get_legend(plot(cv_predict)), rel_widths = c(1, 1, 1, 0.4), nrow = 1, labels = &quot;auto&quot;)</code></pre>
+<p><img src="https://zachdebruine.com/post/cross-validation-for-nmf-rank-determination/index.en_files/figure-html/unnamed-chunk-6-1.png" width="768" style="display: block; margin: auto auto auto 0;" /></p>
+</div>
+<div id="finding-the-rank-of-the-aml-dataset" class="section level2">
+<h2>Finding the rank of the <code>aml</code> dataset</h2>
+<pre class="r"><code>data(aml)
+cv_impute &lt;- crossValidate(aml, k = 2:14, method = &quot;impute&quot;, reps = 3, seed = 123)
+plot(cv_impute) + scale_y_continuous(trans = &quot;log10&quot;)</code></pre>
+<p><img src="https://zachdebruine.com/post/cross-validation-for-nmf-rank-determination/index.en_files/figure-html/unnamed-chunk-7-1.png" width="768" style="display: block; margin: auto auto auto 0;" /></p>
+</div>
+<div id="technical-considerations" class="section level2">
+<h2>Technical considerations</h2>
+<p>Runtime is a major consideration for large datasets. Unfortunately, missing value imputation can be very slow.</p>
+</div>
+<div id="perturb" class="section level2">
+<h2>Perturb</h2>
+<p>Compare missing value imputation with perturb (zeros) and perturb (random):</p>
+<pre class="r"><code>data(hawaiibirds)
+data(aml)
+data(movielens)
+library(Seurat)</code></pre>
+<pre><code>## Warning: package &#39;Seurat&#39; was built under R version 4.0.5</code></pre>
+<pre><code>## Attaching SeuratObject</code></pre>
+<pre class="r"><code>library(SeuratData)</code></pre>
+<pre><code>## Registered S3 method overwritten by &#39;cli&#39;:
+##   method     from         
+##   print.boxx spatstat.geom</code></pre>
+<pre><code>## -- Installed datasets ------------------------------------- SeuratData v0.2.1 --</code></pre>
+<pre><code>## v bmcite       0.3.0                    v pbmc3k       3.1.4
+## v hcabm40k     3.0.0                    v pbmcMultiome 0.1.0
+## v ifnb         3.1.0                    v pbmcsca      3.0.0
+## v panc8        3.0.2                    v stxBrain     0.1.1</code></pre>
+<pre><code>## -------------------------------------- Key -------------------------------------</code></pre>
+<pre><code>## v Dataset loaded successfully
+## &gt; Dataset built with a newer version of Seurat than installed
+## (?) Unknown version of Seurat installed</code></pre>
+<pre class="r"><code>pbmc3k</code></pre>
+<pre><code>## An object of class Seurat 
+## 13714 features across 2700 samples within 1 assay 
+## Active assay: RNA (13714 features, 0 variable features)</code></pre>
+<pre class="r"><code>A &lt;- pbmc3k@assays$RNA@counts
+
+n &lt;- 0.2
+method = &quot;impute&quot;
+cv1 &lt;- crossValidate(A, k = 1:15, method = method, reps = 3, seed = 123, perturb_to = &quot;random&quot;, n = n)
+cv2 &lt;- crossValidate(aml, k = 1:15, method = method, reps = 3, seed = 123, perturb_to = &quot;random&quot;, n = n)
+cv3 &lt;- crossValidate(movielens$ratings, k = 1:15, method = method, reps = 3, seed = 123, perturb_to = &quot;random&quot;, n = n)
+cv4 &lt;- crossValidate(hawaiibirds$counts, k = 1:15, method = method, reps = 3, seed = 123, perturb_to = &quot;random&quot;, n = n)
+plot_grid(
+  plot(cv1) + theme(legend.position = &quot;none&quot;) + scale_y_continuous(trans = &quot;log10&quot;),
+  plot(cv2) + theme(legend.position = &quot;none&quot;) + scale_y_continuous(trans = &quot;log10&quot;),
+  plot(cv3) + theme(legend.position = &quot;none&quot;) + scale_y_continuous(trans = &quot;log10&quot;),
+  plot(cv4) + theme(legend.position = &quot;none&quot;) + scale_y_continuous(trans = &quot;log10&quot;),
+  nrow = 2)</code></pre>
+<p><img src="https://zachdebruine.com/post/cross-validation-for-nmf-rank-determination/index.en_files/figure-html/unnamed-chunk-8-1.png" width="768" style="display: block; margin: auto auto auto 0;" /></p>
+</div>
+
+    </div>
+
+    
+
+
+
+
+
+
+<div class="article-tags">
+  
+  <a class="badge badge-light" href="/tag/nmf/">NMF</a>
+  
+  <a class="badge badge-light" href="/tag/cross-validation/">cross-validation</a>
+  
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+
+
+
+  
+  
+  
+    
+  
+  
+  
+  <div class="media author-card content-widget-hr">
+    
+      
+      <a href="https://zachdebruine.com/"><img class="avatar mr-3 avatar-circle" src="/author/zach-debruine/avatar_hufe5cf19ab3862ec1ff7e31e2bfb05ae9_344625_270x270_fill_q75_lanczos_center.jpg" alt="Zach DeBruine"></a>
+    
+
+    <div class="media-body">
+      <h5 class="card-title"><a href="https://zachdebruine.com/">Zach DeBruine</a></h5>
+      <h6 class="card-subtitle">Postdoctoral Fellow in Bioinformatics</h6>
+      <p class="card-text">Postdoctoral fellow in bioinformatics interested in single-cell experiments and dimensional reduction. I love simple, fast, and common sense data analysis.</p>
+      <ul class="network-icon" aria-hidden="true">
+  
+    
+    
+    
+      
+    
+    
+    
+    
+    
+    <li>
+      <a href="mailto::zacharydebruine@gmail.com" >
+        <i class="fas fa-envelope"></i>
+      </a>
+    </li>
+  
+    
+    
+    
+      
+    
+    
+    
+    
+    
+      
+    
+    <li>
+      <a href="/" >
+        <i class="fas fa-"></i>
+      </a>
+    </li>
+  
+    
+    
+    
+    
+    
+    
+    
+      
+    
+    <li>
+      <a href="https://scholar.google.com/citations?user=l9qurb4AAAAJ" target="_blank" rel="noopener">
+        <i class="ai ai-google-scholar"></i>
+      </a>
+    </li>
+  
+    
+    
+    
+      
+    
+    
+    
+    
+    
+      
+    
+    <li>
+      <a href="https://github.com/zdebruine" target="_blank" rel="noopener">
+        <i class="fab fa-github"></i>
+      </a>
+    </li>
+  
+    
+    
+    
+      
+    
+    
+    
+    
+    
+      
+    
+    <li>
+      <a href="https://www.linkedin.com/in/zacharydebruine/" target="_blank" rel="noopener">
+        <i class="fab fa-linkedin"></i>
+      </a>
+    </li>
+  
+    
+    
+    
+    
+    
+    
+    
+      
+    
+    <li>
+      <a href="https://orcid.org/0000-0003-2234-4827/" target="_blank" rel="noopener">
+        <i class="ai ai-orcid"></i>
+      </a>
+    </li>
+  
+    
+    
+    
+      
+    
+    
+    
+    
+    
+      
+    
+    <li>
+      <a href="https://stackoverflow.com/users/1436247/zdebruine/" target="_blank" rel="noopener">
+        <i class="fab fa-stack-overflow"></i>
+      </a>
+    </li>
+  
+</ul>
+
+    </div>
+  </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+</article>
+  </div>
+
+  <div class="page-footer">
+    
+    
+    <div class="container">
+      
+
+    <script src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS_HTML"></script>
+    
+    <script type="text/x-mathjax-config">
+    MathJax.Hub.Config({
+        tex2jax: {
+            inlineMath: [ ['$','$'], ["\\(","\\)"] ],
+            displayMath: [ ['$$','$$'], ["\\[","\\]"] ],
+            processEscapes: true,
+            processEnvironments: true
+        },
+        // Center justify equations in code and markdown cells. Elsewhere
+        // we use CSS to left justify single line equations in code cells.
+        displayAlign: 'center',
+        "HTML-CSS": {
+            styles: {'.MathJax_Display': {"margin": 0}},
+            linebreaks: { automatic: true }
+        }
+    });
+    </script>
+    
+    </div>
+    
+  </div>
+
+  
+<div id="modal" class="modal fade" role="dialog">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Cite</h5>
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body">
+        <pre><code class="tex hljs"></code></pre>
+      </div>
+      <div class="modal-footer">
+        <a class="btn btn-outline-primary my-1 js-copy-cite" href="#" target="_blank">
+          <i class="fas fa-copy"></i> Copy
+        </a>
+        <a class="btn btn-outline-primary my-1 js-download-cite" href="#" target="_blank">
+          <i class="fas fa-download"></i> Download
+        </a>
+        <div id="modal-error"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+      
+
+    
+    <script src="/js/vendor-bundle.min.b73dfaac3b6499dc997741748a7c3fe2.js"></script>
+
+    
+    
+    
+      
+      
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.imagesloaded/4.1.4/imagesloaded.pkgd.min.js" integrity="sha256-lqvxZrPLtfffUl2G/e7szqSvPBILGbwmsGE1MKlOi0Q=" crossorigin="anonymous"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.isotope/3.0.6/isotope.pkgd.min.js" integrity="sha256-CBrpuqrMhXwcLLUd5tvQ4euBHCdh7wGlDfNz8vbu/iI=" crossorigin="anonymous"></script>
+      
+
+      
+      
+
+      
+
+      
+        
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.2.0/highlight.min.js" integrity="sha512-TDKKr+IvoqZnPzc3l35hdjpHD0m+b2EC2SrLEgKDRWpxf2rFCxemkgvJ5kfU48ip+Y+m2XVKyOCD85ybtlZDmw==" crossorigin="anonymous"></script>
+        
+        
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.2.0/languages/r.min.js" crossorigin="anonymous"></script>
+        
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.2.0/languages/python.min.js" crossorigin="anonymous"></script>
+        
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.2.0/languages/latex.min.js" crossorigin="anonymous"></script>
+        
+      
+
+    
+
+    
+    
+    
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/leaflet.min.js" integrity="sha512-SeiQaaDh73yrb56sTW/RgVdi/mMqNeM2oBwubFHagc5BkixSpP1fvqF47mKzPGWYSSy4RwbBunrJBQ4Co8fRWA==" crossorigin="anonymous"></script>
+    
+
+    
+    
+
+    
+    
+    
+      
+      <script id="search-hit-fuse-template" type="text/x-template">
+        <div class="search-hit" id="summary-{{key}}">
+          <div class="search-hit-content">
+            <div class="search-hit-name">
+              <a href="{{relpermalink}}">{{title}}</a>
+              <div class="article-metadata search-hit-type">{{type}}</div>
+              <p class="search-hit-description">{{snippet}}</p>
+            </div>
+          </div>
+        </div>
+      </script>
+      
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/fuse.js/3.2.1/fuse.min.js" integrity="sha256-VzgmKYmhsGNNN4Ph1kMW+BjoYJM2jV5i4IlFoeZA9XI=" crossorigin="anonymous"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/mark.js/8.11.1/jquery.mark.min.js" integrity="sha256-4HLtjeVgH0eIB3aZ9mLYF6E8oU5chNdjU6p6rrXpl9U=" crossorigin="anonymous"></script>
+      
+    
+
+    
+    
+
+    
+    
+    
+    
+
+    
+    
+      
+      
+      
+      
+      
+      
+      
+    
+
+    
+    
+    
+    
+    
+    
+    
+    
+      
+      
+    
+    
+    <script src="/en/js/wowchemy.min.d68ecd57c0ec1f1f61d65fd568f1c3a0.js"></script>
+
+    
+  <script async defer src="https://buttons.github.io/buttons.js"></script>
+
+
+
+
+</body>
+</html>
