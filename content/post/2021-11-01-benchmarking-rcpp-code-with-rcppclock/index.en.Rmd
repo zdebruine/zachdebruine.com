@@ -10,9 +10,8 @@ tags:
 - Rcpp
 - benchmark
 subtitle: Seamless Rcpp benchmarking in R with a simple tick-tock clock
-summary: Timing Rcpp code is challenging. Latency between R and Rcpp, along with associated
-  C++ library to provide an R-friendly benchmarking experience. type conversions,
-  can confound results. The RcppClock R package wraps the std::chrono
+summary: Timing Rcpp code is challenging. Latency between R and Rcpp can confound results due to data type conversions. The RcppClock C++ library
+  provides a non-intrusive R-friendly benchmarking experience and is a shallow wrapper around the std::chrono headers.
 featured: no
 image:
   caption: ''
