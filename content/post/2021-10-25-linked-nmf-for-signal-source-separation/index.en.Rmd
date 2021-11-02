@@ -1,8 +1,10 @@
 ---
 title: "Linked NMF for Signal Source Separation"
 author: "Zach DeBruine"
-date: '2021-10-25'
-slug: linked-nmf-for-signal-source-separation
+date: '2021-10-28'
+output:
+  pdf_document: default
+  word_document: default
 categories:
 - NMF
 - methods
@@ -23,6 +25,7 @@ image:
   caption: ''
   focal_point: ''
   preview_only: yes
+slug: linked-nmf-for-signal-source-separation
 ---
 
 ```{r setup, include = FALSE}
@@ -33,7 +36,7 @@ knitr::opts_chunk$set(echo = TRUE, fig.align = "left")
 
 ## Basic NMF
 
-Non-negative matrix factorization (NMF) enforces non-negativity in place of orthogonality to learn an additive, low-rank representation of some non-negative matrix $A_{N \times M}$ in terms of the Frobenius norm:
+Non-negative matrix factorization (NMF) enforces non-negativity in place of orthogonality to learn an additive, low-rank representation of some non-negative matrix $A_{N \times M}$ by minimizing the Frobenius norm:
 
 $$\tag{1} \min_{\{W, H\} \geq0} \lVert A - WH \rVert_F^2$$
 
@@ -204,6 +207,17 @@ library(RcppML)
 ```
 
 The `RcppML::lnmf` function takes a list of datasets, a rank for the shared matrix (`k_wh`), ranks for each of the unique matrix (`k_uv`), and parameters also used in the `nmf` implementation.
+
+## Synthetic data
+
+Suppose we have three datasets with shared and unique signal:
+
+```{R}
+
+
+```
+
+## Real data
 
 The example below uses the `aml` dataset to find common signal between AML and reference cell methylation signatures.
 

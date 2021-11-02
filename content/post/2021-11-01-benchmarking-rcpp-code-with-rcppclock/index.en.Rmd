@@ -1,0 +1,126 @@
+---
+title: "Benchmarking Rcpp code with RcppClock"
+author: "Zach DeBruine"
+date: '2021-11-01'
+slug: benchmarking-rcpp-code
+categories:
+- Rcpp
+- methods
+tags:
+- Rcpp
+- benchmark
+subtitle: Seamless Rcpp benchmarking in R with a simple tick-tock clock
+summary: Timing Rcpp code is challenging. Latency between R and Rcpp, along with associated
+  C++ library to provide an R-friendly benchmarking experience. type conversions,
+  can confound results. The RcppClock R package wraps the std::chrono
+featured: no
+image:
+  caption: ''
+  focal_point: ''
+  preview_only: yes
+---
+
+## Microbenchmarking Rcpp code
+
+Benchmarking is awesome. It's rewarding to find bottlenecks in code, piece apart the trouble-makers, and put together an amazingly fast bit of code.
+
+The `microbenchmark` R package is my go-to for any R functions, but there isn't a really nice equivalent for benchmarking in Rcpp. True, there is the internal Rcpp `timer`, but it's very rudimentary and especially leaves a lot to be desired on the R side of things.
+
+So I wrote up a new Rcpp package called `RcppClock`.
+
+* On the Rcpp side you can measure the execution of functions using the `std::chrono::high_resolution_clock` features. Just call `.tick(std::string ticker_label)` to start a timer, and `.tock(std::string ticker_label)` to stop that timer. When you call `.stop(std::string R_var_name)`, the class writes to a global variable in the R environment (no need to wrap or return a clock class from a function).
+* On the R side, you'll magically get a global variable containing timing results at runtime, and you can easily print it to the console (just like a data.frame), or plot it with ggplot2.
+
+## A simple example
+
+First, install RcppClock from CRAN.
+
+```{Rcpp, ref.label=knitr::all_rcpp_labels(), include=FALSE}
+```
+
+```{R, warning = FALSE, message = FALSE}
+# install.packages("RcppClock")
+library(RcppClock)
+```
+
+Then in your `.cpp` file, link the RcppClock header with `//[[Rcpp::depends(RcppClock)]]` (and link to it in your `DESCRIPTION` file if this is an R package).
+
+```{Rcpp, eval = FALSE}
+//[[Rcpp::depends(RcppClock)]]
+#include <RcppClock.h>
+#include <thread>
+
+//[[Rcpp::export]]
+void sleepy(){
+  Rcpp::Clock clock;
+  
+  clock.tick("both_naps");
+  
+  clock.tick("short_nap");
+  std::this_thread::sleep_for(std::chrono::milliseconds(10));  
+  clock.tock("short_nap");
+  
+  clock.tick("long_nap");
+  std::this_thread::sleep_for(std::chrono::milliseconds(100));  
+  clock.tock("long_nap");
+
+  clock.tock("both_naps");
+  
+  // send the times to the R global environment variable, named "naptimes"
+  clock.stop("naptimes");
+}
+```
+
+`.tick(std::string)` starts a new timer. Provide a name to record what is being timed.
+
+`.tock(std::string)` stops a timer. It is important to use the same name as declared in .tick().
+
+`.stop(std::string)` calculates the duration between all .tick() and .tock() timing results, and creates an object in the R environment with the name provided.
+
+On the R end, we can now do stuff with the "naptimes" variable that was created in the above Rcpp function:
+
+```{R}
+sleepy()
+# global variable "naptimes" is now created in the environment
+naptimes
+```
+
+## Timing fibonacci sequences
+
+Here's a nice example showing how it can be useful to time replicates of a calculation.
+
+Note that if a `.tick()` with the same name is called multiple times, RcppClock automatically groups the results. On the other hand, it is a bad idea to specify a `.tick()` without a correspondingly named `.tock()` -- it won't work.
+
+The following code reproduces the ?fibonacci function example included in the RcppClock package:
+
+```{Rcpp, eval = FALSE}
+int fib(int n) {
+  return ((n <= 1) ? n : fib(n - 1) + fib(n - 2));
+}
+
+//[[Rcpp::export]]
+void fibonacci(std::vector<int> n, int reps = 10) {
+  Rcpp::Clock clock;
+  
+  while(reps-- > 0){
+    for(auto number : n){
+      clock.tick("fib" + std::to_string(number));
+      fib(number);
+      clock.tock("fib" + std::to_string(number));
+    }
+  }
+  clock.stop("clock");
+}
+```
+
+On the R end, we'll get an object named "clock":
+
+```{R}
+fibonacci(n = 25:35, reps = 10)
+# global variable "clock" is created in the R global environment
+summary(clock, units = "ms")
+```
+
+```{R, fig.width = 4, fig.height = 3}
+plot(clock)
+```
