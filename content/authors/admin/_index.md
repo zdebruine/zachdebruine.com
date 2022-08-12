@@ -1,27 +1,30 @@
 ---
-bio: Postdoctoral fellow in bioinformatics interested in single-cell experiments and dimensional reduction. I love simple, fast, and common sense data analysis.
+bio: Assistant Professor of Bioinformatics at Grand Valley State University.  Interested in single-cell experiments and dimension reduction. I love simple, fast, and common sense machine learning.
 education:
   courses:
+  - course: Postdoctoral fellowship in Bioinformatics
+    institution: Van Andel Institute
+    year: 2022
   - course: PhD in Biochemistry and Bioinformatics
     institution: Van Andel Institute
     year: 2021
   - course: BSc in Biochemistry and Molecular Biology
     institution: Hope College
     year: 2015
-email: ""
+email: "debruinz@gvsu.edu"
 highlight_name: true
 interests:
-- Dimensional Reduction
+- Non-negative Matrix Factorization
 - Single-cell Analysis
-- Gene Regulation
+- Machine Learning
 organizations:
-- name: Van Andel Institute
-  url: https://www.vai.org/
-role: Postdoctoral Fellow in Bioinformatics
+- name: Grand Valley State University
+  url: https://www.gvsu.edu
+role: Assistant Professor of Bioinformatics
 social:
 - icon: envelope
   icon_pack: fas
-  link: mailto::zacharydebruine@gmail.com
+  link: mailto::debruinz@gvsu.edu
 - display:
     header: true
 - icon: google-scholar
@@ -43,8 +46,8 @@ superuser: true
 title: Zach DeBruine
 ---
 
-My name is Zach DeBruine and I am a postdoctoral fellow in bioinformatics at the [Van Andel Institute](https://www.vai.org/). I work in the [Center for Epigenetics](https://vari.vai.org/epigenetics/) within the [Triche Lab](https://trichelab.vai.org/) where I develop methods for analysis of single-cell experiments. I love simple, fast, and common sense data analysis.
+My name is Zach DeBruine and I am an Assistant Professor of Bioinformatics at [Grand Valley State University](https://www.gvsu.edu) and Adjunct Professor at the [Van Andel Institute](https://www.vai.org/). I work in the [Department of Computing](https://www.gvsu.edu/computing/) and the [Applied Computing Institute]([https://vari.vai.org/epigenetics/](https://www.gvsu.edu/aci/)) where my lab develops methods for analysis of single-cell experiments.
 
-I developed the general-purpose [Rcpp Machine Learning Library (RcppML)](https://github.com/zdebruine/RcppML) R package for non-negative factorization and clustering. This blog is my sandbox for trying new things, sharing stuff I've learned, and testing stuff I've built.
+I developed the general-purpose [Rcpp Machine Learning Library (RcppML)](https://github.com/zdebruine/RcppML) R package around my implementation of Non-negative Matrix Factorization (NMF), which is the world's fastest and most flexible implementation of the method. This blog is my sandbox for trying new things, sharing stuff I've learned, and testing stuff I've built.
 
 This blog is built with [blogdown](https://github.com/rstudio/blogdown) and [Hugo](https://gohugo.io/), and deployed using [Netlify](https://www.netlify.com/).
