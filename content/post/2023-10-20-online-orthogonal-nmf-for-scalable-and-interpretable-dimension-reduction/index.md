@@ -20,13 +20,13 @@ In this vignette, I explore a new method for achieving NMF-like results with muc
 
 NMF has been observed to behave similarly to specific non-deep autoencoders. NMF seeks to minimize the following problem:
 
-$$min_{\{W,H\}\geq 0} \lVert A - WH \rVert^2_2 $$
+`$$min_{\{W,H\}\geq 0} \lVert A - WH \rVert^2_2$$`
 
 where `\(W\)` and `\(H\)` are low-rank matrices the matrix multiplication product of which approximates `\(A\)`.
 
 In contrast, autoencoders with a squared error loss function are minimizing the following:
 
-$$min \lVert A - A' \rVert^2_2 $$
+`$$min \lVert A - A' \rVert^2_2$$`
 
 where `\(A'\)` is the reconstruction of `\(A\)` in the output layer.
 
@@ -54,7 +54,7 @@ Thus, *online orthogonal NMF (ooNMF)* is a single-layer tied-weights autoencoder
 ## Computational Properties of Online Orthogonal NMF (ooNMF)
 
 ooNMF has several computational advantages:
-* It scales in linear time with respect to _m_ or _n_
+* It scales in linear time with respect to the number of samples
 * It replaces computationally intensive NNLS solvers with simple ReLu activations
 * It can take advantage of moment-based optimizers to accelerate convergence (e.g. adam)
 
@@ -184,11 +184,11 @@ If indeed we did enforce orthogonality of "W" (for instance, with Gram Schmidt) 
 WWT <- crossprod(oonmf_model$w)
 ```
 
-<img src="{{< blogdown/postref >}}index_files/figure-html/unnamed-chunk-9-1.png" width="192" />
+<img src="{{< blogdown/postref >}}index_files/figure-html/unnamed-chunk-9-1.png" width="288" />
 
 It both looks pretty close to orthogonal, and it numerically close:
 
-<img src="{{< blogdown/postref >}}index_files/figure-html/unnamed-chunk-10-1.png" width="192" />
+<img src="{{< blogdown/postref >}}index_files/figure-html/unnamed-chunk-10-1.png" width="288" />
 
 Orthogonality is thus approximate. Note that a truly orthogonal NMF is not practical as a meaningful lower-dimensional representation of data.
 

@@ -22,13 +22,13 @@ In this vignette, I explore a new method for achieving NMF-like results with muc
 
 NMF has been observed to behave similarly to specific non-deep autoencoders. NMF seeks to minimize the following problem:
 
-$$min_{\{W,H\}\geq 0} \lVert A - WH \rVert^2_2 $$
+$$min_{\{W,H\}\geq 0} \lVert A - WH \rVert^2_2$$
 
 where $W$ and $H$ are low-rank matrices the matrix multiplication product of which approximates $A$.
 
 In contrast, autoencoders with a squared error loss function are minimizing the following:
 
-$$min \lVert A - A' \rVert^2_2 $$
+$$min \lVert A - A' \rVert^2_2$$
 
 where $A'$ is the reconstruction of $A$ in the output layer.
 
@@ -56,7 +56,7 @@ Thus, *online orthogonal NMF (ooNMF)* is a single-layer tied-weights autoencoder
 ## Computational Properties of Online Orthogonal NMF (ooNMF)
 
 ooNMF has several computational advantages:
-* It scales in linear time with respect to _m_ or _n_
+* It scales in linear time with respect to the number of samples
 * It replaces computationally intensive NNLS solvers with simple ReLu activations
 * It can take advantage of moment-based optimizers to accelerate convergence (e.g. adam)
 
@@ -259,13 +259,13 @@ If indeed we did enforce orthogonality of "W" (for instance, with Gram Schmidt) 
 WWT <- crossprod(oonmf_model$w)
 ```
 
-```{R, echo = FALSE, fig.width = 2, fig.height = 2}
+```{R, echo = FALSE, fig.width = 3, fig.height = 3}
 heatmap(WWT, scale = "none", Rowv = NA, Colv = NA)
 ```
 
 It both looks pretty close to orthogonal, and it numerically close:
 
-```{R, echo = FALSE, fig.width = 2, fig.height = 2}
+```{R, echo = FALSE, fig.width = 3, fig.height = 3}
 df <- rbind(data.frame("method" = "diag", "value" = diag(WWT)),
             data.frame("method" = "non-diag", "value" = as.vector(WWT[lower.tri(WWT)])))
 ggplot(df, aes(value, fill = method)) + 
