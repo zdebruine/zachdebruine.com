@@ -1,22 +1,39 @@
 ---
 title: "Online Orthogonal NMF for Scalable and Interpretable Dimension Reduction"
 author: "Zach DeBruine"
-date: "2023-10-20"
-slug: "online-orthogonal-nmf-for-scalable-and-interpretable-dimension-reduction"
+date: '2023-10-20'
+output:
+  pdf_document: default
+  word_document: default
+categories:
+- NMF
+- methods
 tags:
 - NMF
 - HPC
+subtitle: Overcoming issues with scalability for NMF with a new method yielding comparable results
+summary: Non-negative matrix factorization is a useful method for additive decomposition
+  of signal within a dataset. However, NMF does not scale well to large datasets, particularly
+  during cross-validation. Here we show that a single-layer tied-weights autoencoder where a non-negativity
+  constraint is applied to the weights matrix can yield results similar to NMF, and promises far better scalability.
+lastmod: '2023-10-21T16:11:14-04:00'
+featured: no
+image:
+  caption: ''
+  focal_point: ''
+  preview_only: yes
+slug: online-orthogonal-nmf
 ---
 
 
 
-## Motivation
+## NMF has a scaling issue
 
 Non-negative Matrix Factorization (NMF) is a popular machine learning method that is often used as a interpretable dimension reduction. While NMF is highly effective in many applications, it scales poorly, distributed algorithms are highly inefficient, and cross-validation is an almost insurmountable bottleneck at large ranks.
 
 In this vignette, I explore a new method for achieving NMF-like results with much better scalability and potential for extension.
 
-## Introduction
+## NMF as an autoencoder
 
 NMF has been observed to behave similarly to specific non-deep autoencoders. NMF seeks to minimize the following problem:
 
@@ -51,7 +68,7 @@ Thus, *online orthogonal NMF (ooNMF)* is a single-layer tied-weights autoencoder
 
 *Orthogonal random initialization*. He initialization is popularly used for autoencoders. We propose to orthogonalize a He initialized weights matrix to ensure that the distribution of models are consistent across random restarts, and as close to a truly orthogonal solution as can be expected without explicit enforcement of orthogonality. A simple way to impose orthogonality is with Gram Schmidt. 
 
-## Computational Properties of Online Orthogonal NMF (ooNMF)
+## Properties of Online Orthogonal NMF (ooNMF)
 
 ooNMF has several computational advantages:
 * It scales in linear time with respect to the number of samples
@@ -140,6 +157,8 @@ svd_model <- irlba::irlba(A, 15)
 pca_model <- irlba::prcomp_irlba(A, 15, scale = TRUE)
 ```
 
+### Similarity of Reconstructions
+
 Generate reconstructions for most models:
 
 
@@ -151,48 +170,35 @@ recon_svd <- as.matrix(svd_model$u %*% Diagonal(x = svd_model$d) %*% t(svd_model
 
 Compare the similarity of reconstructions:
 
-<img src="{{< blogdown/postref >}}index_files/figure-html/unnamed-chunk-4-1.png" width="624" />
+<img src="{{< blogdown/postref >}}index_files/figure-html/unnamed-chunk-4-1.png" width="624" style="display: block; margin: auto auto auto 0;" />
 
-All methods approximate the input data well.  We can also measure the mean squared error of reconstruction for these methods:
+All methods approximate the input data well.  
 
-<img src="{{< blogdown/postref >}}index_files/figure-html/unnamed-chunk-5-1.png" width="672" />
+### Reconstruction Accuracy 
+
+We can also measure the mean squared error of reconstruction for these methods:
+
+<img src="{{< blogdown/postref >}}index_files/figure-html/unnamed-chunk-5-1.png" width="672" style="display: block; margin: auto auto auto 0;" />
 
 ooNMF compares favorably with NMF and SVD when realizing that it is both approximately orthogonal and updated online.
 
-## Similarity to other Dimension Reductions
+### UMAP embeddings
 
 Compare the UMAP plots from the low-rank matrices:
 
-<img src="{{< blogdown/postref >}}index_files/figure-html/unnamed-chunk-6-1.png" width="480" />
+<img src="{{< blogdown/postref >}}index_files/figure-html/unnamed-chunk-6-1.png" width="480" style="display: block; margin: auto auto auto 0;" />
 
 Visually, all plots appear informative and convey similar information.
 
+### Overlap of Nearest Neighborhoods
+
 Compare the overlap between nearest neighborhoods in the lower-dimensional space. We will do this using a jaccard measure of overlap between neighborhoods for each sample.
 
-<img src="{{< blogdown/postref >}}index_files/figure-html/unnamed-chunk-7-1.png" width="576" />
+<img src="{{< blogdown/postref >}}index_files/figure-html/unnamed-chunk-7-1.png" width="576" style="display: block; margin: auto auto auto 0;" />
 
 All of the shared nearest neighborhoods are very similar between all methods, which supports the observation from UMAP that the visualizations are similarly informative. However, ooNMF is most similar to NMF and the raw data. Notably, less similar to orthogonal methods SVD and PCA.
 
-## Approximate Orthogonality 
-
-The expectation of orthogonal NMF is that `\(WW^T\)` will approximately yield the identity matrix. This is the case for SVD, but it is only approximately true for NMF due to non-negativity constraints and no explicit enforcement of orthogonality during fitting. 
-
-If indeed we did enforce orthogonality of "W" (for instance, with Gram Schmidt) during fitting, we would encounter negative values in "W", and setting those back to 0 would just complicate stochastic gradient descent after non-negativity constraints on W.
-
-
-```r
-WWT <- crossprod(oonmf_model$w)
-```
-
-<img src="{{< blogdown/postref >}}index_files/figure-html/unnamed-chunk-9-1.png" width="288" />
-
-It both looks pretty close to orthogonal, and it numerically close:
-
-<img src="{{< blogdown/postref >}}index_files/figure-html/unnamed-chunk-10-1.png" width="288" />
-
-Orthogonality is thus approximate. Note that a truly orthogonal NMF is not practical as a meaningful lower-dimensional representation of data.
-
-## Sparsity
+### Sparsity
 
 Sparsity of the model is slightly lower than NMF, but comparable:
 
@@ -205,7 +211,28 @@ Sparsity of the model is slightly lower than NMF, but comparable:
 ## 4  ooNMF     H 0.01780783
 ```
 
-## Extending ooNMF Architecture
+## Approximate Orthogonality 
+
+The expectation of orthogonal NMF is that `\(WW^T\)` will approximately yield the identity matrix. This is the case for SVD, but it is only approximately true for NMF due to non-negativity constraints and no explicit enforcement of orthogonality during fitting. 
+
+If indeed we did enforce orthogonality of "W" (for instance, with Gram Schmidt) during fitting, we would encounter negative values in "W", and setting those back to 0 would just complicate stochastic gradient descent after non-negativity constraints on W.
+
+
+```r
+WWT <- crossprod(oonmf_model$w)
+```
+
+<img src="{{< blogdown/postref >}}index_files/figure-html/unnamed-chunk-10-1.png" width="288" style="display: block; margin: auto auto auto 0;" />
+
+It both looks pretty close to orthogonal, and it numerically close:
+
+<img src="{{< blogdown/postref >}}index_files/figure-html/unnamed-chunk-11-1.png" width="288" style="display: block; margin: auto auto auto 0;" />
+
+If this were a true identity matrix, we would expect all 1's on the diagonal and all 0's on the off-diagonal. This is exactly the case for rank-truncated SVD (within machine precision tolerances), but not for ooNMF.
+
+ooNMF orthogonality is thus approximate. The same holds true for previously published orthogonal NMF. Note that a truly orthogonal NMF is not practical as a meaningful lower-dimensional representation of data.
+
+## Extending the ooNMF Architecture
 
 We may consider a number of alternative architectures to ooNMF proposed here.
 
@@ -239,12 +266,13 @@ Framing NMF as an autoencoder allows us to adopt many exciting ideas from the de
 
 ## Future directions
 
+### Outlook
+
+ooNMF promises to produce interpretable low-dimensional latent spaces that are highly reminiscent of NMF but with much better scaling and easier cross-validation. We look forward to testing ooNMF on very large real-world data and comparing to NMF models that were trained at the limit of available compute resources.
+
+### Development Priorities
 * Methods for L1 regularization of this neural architecture should be explored to help boost sparsity of both "W" and "H"
 * Minibatch updates and Adam optimization for faster convergence
 * Special properties of the tied-weights enable more efficient algorithms for updating weights
 * High-performance implementation in C++ will demonstrate scalability of the algorithm
 * Systematic benchmarking of this method vs. NMF for current applications to derive insights or for exploratory data analysis
-
-## Outlook
-
-ooNMF promises to produce interpretable low-dimensional latent spaces that are highly reminiscent of NMF but with much better scaling and easier cross-validation. We look forward to testing ooNMF on very large real-world data and comparing to NMF models that were trained at the limit of available compute resources.
