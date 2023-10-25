@@ -37,34 +37,34 @@ In this vignette, I explore a new method for achieving NMF-like results with muc
 
 NMF has been observed to behave similarly to specific non-deep autoencoders. NMF seeks to minimize the following problem:
 
-`$$min_{\{W,H\}\geq 0} \lVert A - WH \rVert^2_2$$`
+$$min_{\{W,H\}\geq 0} \lVert A - WH \rVert^2_2$$
 
-where `\(W\)` and `\(H\)` are low-rank matrices the matrix multiplication product of which approximates `\(A\)`.
+where $W$ and $H$ are low-rank matrices the matrix multiplication product of which approximates $A$.
 
 In contrast, autoencoders with a squared error loss function are minimizing the following:
 
-`$$min \lVert A - A' \rVert^2_2$$`
+$$min \lVert A - A' \rVert^2_2$$
 
-where `\(A'\)` is the reconstruction of `\(A\)` in the output layer.
+where $A'$ is the reconstruction of $A$ in the output layer.
 
 Suppose now that we have a single-layer autoencoder with tied weights (meaning the encoder and decoder weights matrices are transpose-identical), and a ReLu activation function in the hidden layer and the output layer:
 
-`$$A' = max(0, max(0, AW)W^T)$$`
+$$A' = max(0, max(0, AW)W^T)$$
 
-Now suppose we enforce that `\(W \geq 0\)` and assume `\(A \geq 0\)`, then it is impossible for `\(H < 0\)` and ReLu is not necessary to enforce. This reduces to the following optimization problem:
+Now suppose we enforce that $W \geq 0$ and assume $A \geq 0$, then it is impossible for $H < 0$ and ReLu is not necessary to enforce. This reduces to the following optimization problem:
 
 $$min_{\{W \geq 0\}} \lVert A - AWW^T \rVert^2_2 $$
 which is the loss function for orthogonal NMF.
 
 Thus, *online orthogonal NMF (ooNMF)* is a single-layer tied-weights autoencoder (with a ReLu activation function) where the weights are enforced to be non-negative.
 
-*Hidden layer*. Note that `\(H = max(0, AW)\)` and is the "hidden layer" in this autoencoder. `\(H\)` may be linearly decoded to give a lower-dimensional representation of the input data, since the number of neurons ($k$) in the hidden layer is always much less than the rank of the matrix `\(A\)`.
+*Hidden layer*. Note that $H = max(0, AW)$ and is the "hidden layer" in this autoencoder. $H$ may be linearly decoded to give a lower-dimensional representation of the input data, since the number of neurons ($k$) in the hidden layer is always much less than the rank of the matrix $A$.
 
 *No bias terms*. Similarly to NMF, there are no bias terms added to the inputs of the hidden layer that could challenge interpretability. By omitting bias terms, the model is forced to learn a maximally informative and interpretable weights matrix. Indeed, non-negative bias terms cannot benefit the model when there are no negative weights.
 
 *Choice of activation function*. This model is exceptionally well suited to ReLu as an activation function, and while other activation functions might theoretically be explored, they are unlikely to respond effectively to non-negative weights or compare well to existing dimensions, and would result in significant additional computational cost.
 
-*Approximate orthogonality.* The expectation of orthogonal NMF is that `\(WW^T \approx I\)`, thus in online orthogonal NMF, we may think of orthogonalizing `\(W\)`, however due to non-negativity constraints this orthogonalization will never be accurate, and thus we do not explicitly enforce orthogonality in any way.
+*Approximate orthogonality.* The expectation of orthogonal NMF is that $WW^T \approx I$, thus in online orthogonal NMF, we may think of orthogonalizing $W$, however due to non-negativity constraints this orthogonalization will never be accurate, and thus we do not explicitly enforce orthogonality in any way.
 
 *Orthogonal random initialization*. He initialization is popularly used for autoencoders. We propose to orthogonalize a He initialized weights matrix to ensure that the distribution of models are consistent across random restarts, and as close to a truly orthogonal solution as can be expected without explicit enforcement of orthogonality. A simple way to impose orthogonality is with Gram Schmidt. 
 
@@ -77,9 +77,9 @@ ooNMF has several computational advantages:
 
 *Convergence properties.* In practice, NMF by alternating least squares (ALS-NMF) converges in fewer epoch than adam-optimized ooNMF, but ooNMF has the potential to be far faster per epoch.
 
-*Dense inputs.* ooNMF for dense `\(A\)` will also benefit significantly from GPU acceleration, whereas the NNLS solvers required for oNMF or ALS-NMF reduce the performance of GPU-accelerated NMF.
+*Dense inputs.* ooNMF for dense $A$ will also benefit significantly from GPU acceleration, whereas the NNLS solvers required for oNMF or ALS-NMF reduce the performance of GPU-accelerated NMF.
 
-*Sparse inputs.* ooNMF for sparse `\(A\)` will perform well on GPU or CPU, but the gains from GPU acceleration will be significantly reduced or negligible at small scale.
+*Sparse inputs.* ooNMF for sparse `$A$ will perform well on GPU or CPU, but the gains from GPU acceleration will be significantly reduced or negligible at small scale.
 
 *Parallelization.* Forward- and back-propagation in ooNMF is embarrassingly parallel within batches or mini-batches, and can be readily parallelized with OpenMP with the exception of a critical reduction prior to weights updates.
 
@@ -213,7 +213,7 @@ Sparsity of the model is slightly lower than NMF, but comparable:
 
 ## Approximate Orthogonality 
 
-The expectation of orthogonal NMF is that `\(WW^T\)` will approximately yield the identity matrix. This is the case for SVD, but it is only approximately true for NMF due to non-negativity constraints and no explicit enforcement of orthogonality during fitting. 
+The expectation of orthogonal NMF is that $WW^T$ will approximately yield the identity matrix. This is the case for SVD, but it is only approximately true for NMF due to non-negativity constraints and no explicit enforcement of orthogonality during fitting. 
 
 If indeed we did enforce orthogonality of "W" (for instance, with Gram Schmidt) during fitting, we would encounter negative values in "W", and setting those back to 0 would just complicate stochastic gradient descent after non-negativity constraints on W.
 
@@ -240,17 +240,17 @@ We may consider a number of alternative architectures to ooNMF proposed here.
 
 First, consider a non-tied weights autoencoder:
 
-`\(min_{\{W \geq 0\}} \lVert A - AW_1W_2 \rVert_2^2\)`
+$$min_{\{W \geq 0\}} \lVert A - AW_1W_2 \rVert_2^2$$
 
-This architecture can achieve better reconstruction accuracy, but loses interpretability since `\(W_1\)` can only be understood in terms of `\(W_2\)`, and vice versa. Furthermore, it allows for non-linear representations to creep into `\(H\)`, confounding linear assumptions in standard exploratory data analysis.
+This architecture can achieve better reconstruction accuracy, but loses interpretability since $W_1$ can only be understood in terms of $W_2$, and vice versa. Furthermore, it allows for non-linear representations to creep into $H$, confounding linear assumptions in standard exploratory data analysis.
 
 ### Deep extensions
 
 Consider deep ooNMF:
 
-`\(min_{\{W_1, W_2\} \geq 0} \lVert A - AW_1W_2W_2^TW_1^T\rVert_2^2\)`
+$$min_{\{W_1, W_2\} \geq 0} \lVert A - AW_1W_2W_2^TW_1^T\rVert_2^2$$
 
-And similar deeper extensions. Note that ReLu can be considered to be applied, but it is never necessary in practice with `\(A \geq 0\)`. These deeper extensions introduce non-linearity into the middle latent space, and it is no longer interpretable. While this deep extension may be interesting as a self-regularizing semi-orthonormal method for disentangling parts of complex feature sets, it is unlikely to serve for any interpretable dimension reduction.
+And similar deeper extensions. Note that ReLu can be considered to be applied, but it is never necessary in practice with $A \geq 0$. These deeper extensions introduce non-linearity into the middle latent space, and it is no longer interpretable. While this deep extension may be interesting as a self-regularizing semi-orthonormal method for disentangling parts of complex feature sets, it is unlikely to serve for any interpretable dimension reduction.
 
 For the purposes of interpretability, we therefore restrict algorithms to a single hidden layer with constrained and tied-weights. 
 
