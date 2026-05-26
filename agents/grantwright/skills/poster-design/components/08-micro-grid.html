@@ -1,0 +1,32 @@
+<!--
+  COMPONENT 08 — MICRO-CARD GRID
+  =================================================================
+  A 2- or 3-column grid of small bordered cards. Each card has:
+    - A JetBrains Mono uppercase label
+    - A Newsreader serif big number with accent-ink unit
+    - A muted 14px context line
+
+  Use for: clusters of supporting stats that don't deserve the hero band.
+
+  Content fields (section: kind=micro_grid):
+    cols          — 2 or 3 (defaults to 3)
+    cells[]:
+      label       — string ("Input · .1fq")
+      value       — string ("24")
+      unit        — string ("%", "× faster", "PB")
+      ctx_html    — short muted descriptor
+
+  Visual rules:
+    - Border: 1px var(--rule-strong), 4px radius.
+    - Padding: 0.14in 0.16in.
+    - Value uses var(--accent-ink) Newsreader 32px.
+-->
+<div class="micro-grid"{% if section.cols == 2 %} style="grid-template-columns: 1fr 1fr;"{% endif %}>
+    {% for c in section.cells %}
+    <div class="micro">
+        <div class="lab">{{ c.label }}</div>
+        <div class="v">{{ c.value }}<span class="u">{{ c.unit }}</span></div>
+        <div class="ctx">{{ c.ctx_html }}</div>
+    </div>
+    {% endfor %}
+</div>

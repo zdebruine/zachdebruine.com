@@ -1,0 +1,1220 @@
+/* =================================================================
+           CLINICAL INTELLIGENCE — Michigan Clinical Genetics Conference 2026
+           36 in (W) × 48 in (H) portrait. Minimalist, white background,
+           single accent (Herd cyan). Hairline rules, generous whitespace,
+           Newsreader serif headings, Inter body, JetBrains Mono labels.
+
+           Layout strategy:
+           - .stage is the on-screen-sized wrapper (occupies actual scaled
+             pixel area so scrollbars match what's visible).
+           - .poster has true print dimensions (36in × 48in = 3456 × 4608 px
+             at 96 dpi) and is scaled via CSS transform.
+           - JS sets --scale on resize. @media print resets to 1.0.
+           ================================================================= */
+
+        :root {
+            /* True print dimensions, in CSS inches — landscape */
+            --pw: 48in;
+            --ph: 36in;
+            --scale: 0.32;
+
+            /* Color tokens */
+            --ink: #0F1419;
+            --body: #2A2F36;
+            --muted: #5C6470;
+            --dim: #8A93A0;
+            --rule: #E2E5EA;
+            --rule-strong: #C2C7CF;
+            --paper: #FFFFFF;
+            --tint: #F6F8FA;
+            --tint-2: #EEF2F5;
+
+            /* Single accent: a calmer Herd cyan */
+            --accent: #0EA5C2;
+            --accent-ink: #0B6E83;
+            --accent-deep: #084C5C;
+            --accent-tint: #E6F6FA;
+            --accent-tint-2: #F2FBFD;
+
+            /* Subtle warning/clinical contrast — used sparingly */
+            --warn: #B45309;
+            --warn-tint: #FEF7EC;
+        }
+
+        @page {
+            size: 48in 36in;
+            margin: 0;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            margin: 0;
+            padding: 0;
+            background: #E9ECEF;
+            font-family: 'Inter', system-ui, sans-serif;
+            color: var(--body);
+            -webkit-font-smoothing: antialiased;
+            text-rendering: geometricPrecision;
+        }
+
+        /* ----- Stage wrapper takes the scaled visual size ------------- */
+        .stage {
+            width: calc(var(--pw) * var(--scale));
+            height: calc(var(--ph) * var(--scale));
+            position: relative;
+            margin: 24px auto 48px;
+            box-shadow:
+                0 0 0 1px rgba(0, 0, 0, 0.06),
+                0 60px 80px -40px rgba(0, 0, 0, 0.18);
+        }
+
+        /* ----- Poster itself: full print dimensions ------------------- */
+        .poster {
+            width: var(--pw);
+            height: var(--ph);
+            background: var(--paper);
+            color: var(--ink);
+            position: absolute;
+            top: 0;
+            left: 0;
+            transform: scale(var(--scale));
+            transform-origin: top left;
+            overflow: hidden;
+            padding: 0.65in 0.85in 0.55in 0.85in;
+            display: grid;
+            grid-template-rows: auto 4px auto auto auto auto auto;
+            row-gap: 0.22in;
+        }
+
+        /* Subtle accent watermark in lower-right corner */
+        .poster::after {
+            content: '';
+            position: absolute;
+            right: -8in;
+            bottom: -8in;
+            width: 22in;
+            height: 22in;
+            border-radius: 50%;
+            background: radial-gradient(closest-side, var(--accent-tint), transparent 70%);
+            pointer-events: none;
+            z-index: 0;
+            opacity: 0.55;
+        }
+
+        .poster>* {
+            position: relative;
+            z-index: 1;
+        }
+
+        /* ============================================================
+           TYPOGRAPHY
+           ============================================================ */
+        .kicker {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 24px;
+            letter-spacing: 0.20em;
+            text-transform: uppercase;
+            color: var(--accent-ink);
+            font-weight: 500;
+            display: inline-flex;
+            align-items: center;
+            gap: 18px;
+        }
+
+        .kicker .dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: var(--accent);
+        }
+
+        h1.title {
+            font-family: 'Newsreader', 'Inter', serif;
+            font-weight: 500;
+            font-size: 116px;
+            line-height: 1.0;
+            letter-spacing: -0.020em;
+            margin: 0;
+            color: var(--ink);
+            max-width: 36in;
+        }
+
+        h1.title em {
+            font-style: italic;
+            font-weight: 500;
+            color: var(--accent-ink);
+        }
+
+        .deck {
+            font-size: 28px;
+            line-height: 1.32;
+            color: var(--muted);
+            font-weight: 400;
+            max-width: 34in;
+            margin: 0.16in 0 0 0;
+            letter-spacing: -0.005em;
+        }
+
+        h2.section-h {
+            font-family: 'Inter', sans-serif;
+            font-size: 38px;
+            font-weight: 600;
+            letter-spacing: -0.012em;
+            color: var(--ink);
+            margin: 0;
+            padding-bottom: 0.12in;
+            border-bottom: 2px solid var(--ink);
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            gap: 16px;
+        }
+
+        h2.section-h .ix {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 16px;
+            letter-spacing: 0.18em;
+            color: var(--accent-ink);
+            font-weight: 500;
+            text-transform: uppercase;
+        }
+
+        h3 {
+            font-family: 'Inter', sans-serif;
+            font-size: 24px;
+            font-weight: 600;
+            letter-spacing: -0.008em;
+            margin: 0 0 0.08in 0;
+            color: var(--ink);
+        }
+
+        h4 {
+            font-family: 'Inter', sans-serif;
+            font-size: 19px;
+            font-weight: 600;
+            margin: 0 0 4px 0;
+            color: var(--ink);
+            letter-spacing: -0.005em;
+        }
+
+        p {
+            margin: 0;
+            font-size: 19px;
+            line-height: 1.45;
+            color: var(--body);
+        }
+
+        p+p {
+            margin-top: 0.10in;
+        }
+
+        .lede {
+            font-family: 'Newsreader', serif;
+            font-weight: 400;
+            font-size: 25px;
+            line-height: 1.38;
+            color: var(--ink);
+            letter-spacing: -0.005em;
+        }
+
+        .lede em {
+            color: var(--accent-ink);
+            font-style: italic;
+        }
+
+        small,
+        .meta-text {
+            font-size: 15px;
+            color: var(--muted);
+            line-height: 1.4;
+        }
+
+        b,
+        strong {
+            color: var(--ink);
+            font-weight: 600;
+        }
+
+        .mono {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.92em;
+        }
+
+        /* ============================================================
+           HEADER
+           ============================================================ */
+        header.head {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            column-gap: 0.7in;
+            align-items: end;
+        }
+
+        header.head .lockup {
+            display: flex;
+            flex-direction: column;
+            gap: 0.18in;
+        }
+
+        header.head .meta {
+            text-align: right;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 18px;
+            line-height: 1.55;
+            color: var(--muted);
+            min-width: 8.5in;
+        }
+
+        header.head .meta .v-name {
+            font-family: 'Inter', sans-serif;
+            color: var(--ink);
+            font-weight: 600;
+            display: block;
+            font-size: 22px;
+            letter-spacing: -0.005em;
+            text-transform: none;
+        }
+
+        header.head .authors {
+            margin-top: 0.18in;
+            font-size: 28px;
+            color: var(--ink);
+            font-weight: 500;
+            letter-spacing: -0.005em;
+        }
+
+        header.head .authors .aff {
+            color: var(--muted);
+            font-weight: 400;
+            font-size: 22px;
+            display: block;
+            margin-top: 4px;
+        }
+
+        .rule {
+            border-top: 1px solid var(--rule-strong);
+            grid-column: 1 / -1;
+            height: 0;
+        }
+
+        /* ============================================================
+           HERO STAT BAND
+           ============================================================ */
+        .hero-stats {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 0;
+            border-top: 2px solid var(--ink);
+            border-bottom: 1px solid var(--rule-strong);
+            padding: 0.16in 0;
+        }
+
+        .hero-stats .stat {
+            padding: 0 0.30in;
+            border-right: 1px solid var(--rule);
+        }
+
+        .hero-stats .stat:first-child {
+            padding-left: 0;
+        }
+
+        .hero-stats .stat:last-child {
+            border-right: none;
+            padding-right: 0;
+        }
+
+        .hero-stats .stat .n {
+            font-family: 'Newsreader', serif;
+            font-weight: 500;
+            font-size: 70px;
+            line-height: 0.95;
+            color: var(--ink);
+            letter-spacing: -0.025em;
+        }
+
+        .hero-stats .stat .n .u {
+            font-family: 'Inter', sans-serif;
+            font-weight: 600;
+            font-size: 38px;
+            color: var(--accent-ink);
+            letter-spacing: -0.005em;
+            margin-left: 4px;
+        }
+
+        .hero-stats .stat .l {
+            font-family: 'Inter', sans-serif;
+            font-size: 17px;
+            color: var(--muted);
+            line-height: 1.4;
+            margin-top: 0.10in;
+            max-width: 7in;
+        }
+
+        .hero-stats .stat .l b {
+            color: var(--ink);
+        }
+
+        /* ============================================================
+           PROBLEM BAND (clinical motivation)
+           ============================================================ */
+        .problem {
+            display: grid;
+            grid-template-columns: 1fr 1.3fr;
+            column-gap: 0.55in;
+            align-items: start;
+        }
+
+        .problem .copy h2 {
+            margin-bottom: 0.18in;
+        }
+
+        .problem .copy p {
+            font-size: 21px;
+        }
+
+        .problem .pull {
+            border-left: 4px solid var(--accent);
+            padding-left: 0.22in;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .problem .pull .quote {
+            font-family: 'Newsreader', serif;
+            font-style: italic;
+            font-size: 30px;
+            line-height: 1.32;
+            color: var(--ink);
+            letter-spacing: -0.005em;
+        }
+
+        .problem .pull cite {
+            display: block;
+            margin-top: 0.12in;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 14px;
+            letter-spacing: 0.16em;
+            text-transform: uppercase;
+            color: var(--muted);
+            font-style: normal;
+        }
+
+        /* ============================================================
+           FOUR-COLUMN MAIN BODY
+           Cols 2 + 3 are visually a single "central panel" so we can
+           merge them when content runs wide.
+           ============================================================ */
+        .body {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr 1fr;
+            column-gap: 0.45in;
+            row-gap: 0;
+            align-items: start;
+            position: relative;
+        }
+
+        /* Hairline column gutters — quietly reinforce the 4-up rhythm. */
+        .body::before,
+        .body::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 1px;
+            background: var(--rule);
+        }
+
+        .body::before {
+            left: calc(25% - 0.225in / 2);
+        }
+
+        .body::after {
+            left: calc(75% - 0.225in / 2);
+        }
+
+        /* Subtle separator between the merged middle pair (col 2 | col 3). */
+        .body .midrule {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            left: calc(50% - 0.5px);
+            width: 1px;
+            background: var(--rule);
+        }
+
+        .col {
+            display: flex;
+            flex-direction: column;
+            gap: 0.28in;
+        }
+
+        section.card {
+            display: flex;
+            flex-direction: column;
+            gap: 0.14in;
+        }
+
+        /* ============================================================
+           SUBWAY (build pipeline)
+           ============================================================ */
+        .subway {
+            display: flex;
+            align-items: center;
+            gap: 0;
+            margin: 0.05in 0;
+        }
+
+        .subway .station {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            min-width: 0;
+        }
+
+        .subway .station .pip {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: var(--accent);
+        }
+
+        .subway .station .lbl {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            letter-spacing: 0.14em;
+            color: var(--muted);
+            text-transform: uppercase;
+            white-space: nowrap;
+        }
+
+        .subway .seg {
+            flex: 1;
+            height: 2px;
+            background: var(--accent);
+        }
+
+        /* ============================================================
+           PIPELINE BENCH MICRO-CARDS
+           ============================================================ */
+        .micro-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 0.16in;
+            margin-top: 0.06in;
+        }
+
+        .micro {
+            border: 1px solid var(--rule-strong);
+            border-radius: 4px;
+            padding: 0.14in 0.16in;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            background: var(--paper);
+        }
+
+        .micro .lab {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            color: var(--muted);
+        }
+
+        .micro .v {
+            font-family: 'Newsreader', serif;
+            font-size: 32px;
+            font-weight: 500;
+            color: var(--accent-ink);
+            line-height: 1.05;
+            letter-spacing: -0.015em;
+        }
+
+        .micro .v .u {
+            font-family: 'Inter', sans-serif;
+            font-size: 16px;
+            color: var(--accent-ink);
+            margin-left: 2px;
+            font-weight: 600;
+        }
+
+        .micro .ctx {
+            font-size: 14px;
+            color: var(--muted);
+            line-height: 1.4;
+        }
+
+        /* ============================================================
+           HORIZONTAL BAR CHART (GPU speedups)
+           ============================================================ */
+        .gpu-chart {
+            margin-top: 0.08in;
+            display: grid;
+            grid-template-columns: 2.4in 1fr auto;
+            row-gap: 9px;
+            column-gap: 0.16in;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 14px;
+            color: var(--ink);
+            align-items: center;
+        }
+
+        .gpu-chart .row {
+            display: contents;
+        }
+
+        .gpu-chart .lbl {
+            color: var(--ink);
+            font-weight: 500;
+        }
+
+        .gpu-chart .bar {
+            height: 14px;
+            background: var(--accent);
+            border-radius: 1.5px;
+        }
+
+        .gpu-chart .bar.lite {
+            background: var(--accent-tint);
+            border: 1px solid var(--accent);
+        }
+
+        .gpu-chart .num {
+            color: var(--accent-ink);
+            font-weight: 600;
+            white-space: nowrap;
+            text-align: right;
+        }
+
+        .gpu-chart .axis-note {
+            grid-column: 1 / -1;
+            font-size: 12px;
+            color: var(--muted);
+            font-family: 'Inter', sans-serif;
+            margin-top: 6px;
+            font-style: italic;
+        }
+
+        /* ============================================================
+           CORPUS COMPARISON
+           ============================================================ */
+        .corpus {
+            display: grid;
+            grid-template-columns: 1.4in 1fr auto;
+            column-gap: 0.18in;
+            row-gap: 10px;
+            align-items: center;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 14px;
+        }
+
+        .corpus .clbl {
+            color: var(--ink);
+            font-weight: 500;
+        }
+
+        .corpus .cbar {
+            height: 22px;
+            border-radius: 2px;
+        }
+
+        .corpus .cbar.hca {
+            background: var(--rule-strong);
+        }
+
+        .corpus .cbar.cxg {
+            background: var(--rule-strong);
+        }
+
+        .corpus .cbar.now {
+            background: var(--accent);
+        }
+
+        .corpus .cbar.proj {
+            background: var(--accent-tint);
+            border: 2px dashed var(--accent);
+        }
+
+        .corpus .cnum {
+            font-weight: 600;
+            color: var(--ink);
+            white-space: nowrap;
+        }
+
+        .corpus .cnum.accent {
+            color: var(--accent-ink);
+        }
+
+        /* ============================================================
+           FRAMEWORK STACK (L1 → L4)
+           ============================================================ */
+        .framework {
+            display: flex;
+            flex-direction: column;
+            gap: 0.12in;
+        }
+
+        .layer {
+            border: 1.5px solid var(--rule-strong);
+            border-radius: 6px;
+            padding: 0.13in 0.18in;
+            display: grid;
+            grid-template-columns: 0.55in 1fr;
+            column-gap: 0.18in;
+            align-items: start;
+            background: var(--paper);
+        }
+
+        .layer.foundation {
+            background: var(--accent-tint-2);
+            border-color: var(--accent);
+            border-width: 2px;
+        }
+
+        .layer .ix {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 18px;
+            color: var(--accent-ink);
+            font-weight: 600;
+            letter-spacing: 0.04em;
+            padding-top: 4px;
+        }
+
+        .layer h4 {
+            font-size: 21px;
+        }
+
+        .layer p {
+            font-size: 16px;
+            line-height: 1.40;
+            color: var(--body);
+        }
+
+        .arrow {
+            display: flex;
+            justify-content: center;
+            color: var(--accent);
+            font-size: 22px;
+            font-weight: 300;
+            line-height: 0.4;
+            margin: -2px 0;
+        }
+
+        /* ============================================================
+           VALIDATION TABLE
+           ============================================================ */
+        .results-card {
+            background: var(--accent-tint-2);
+            border: 1.5px solid var(--accent);
+            border-radius: 6px;
+            padding: 0.16in 0.20in;
+            display: flex;
+            flex-direction: column;
+            gap: 0.10in;
+        }
+
+        .results-head {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            gap: 16px;
+        }
+
+        .results-head h3 {
+            font-size: 22px;
+            margin: 0;
+            color: var(--accent-deep);
+        }
+
+        .results-head .tag {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            letter-spacing: 0.16em;
+            text-transform: uppercase;
+            color: var(--accent-ink);
+            font-weight: 500;
+        }
+
+        .results-metrics {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 0;
+            border-top: 1px solid var(--accent);
+            border-bottom: 1px solid var(--accent);
+            padding: 0.12in 0;
+        }
+
+        .results-metrics .m {
+            padding: 0 0.14in;
+            border-right: 1px solid rgba(14, 165, 194, 0.3);
+        }
+
+        .results-metrics .m:first-child {
+            padding-left: 0;
+        }
+
+        .results-metrics .m:last-child {
+            border-right: none;
+            padding-right: 0;
+        }
+
+        .results-metrics .m .mn {
+            font-family: 'Newsreader', serif;
+            font-size: 36px;
+            font-weight: 500;
+            color: var(--accent-deep);
+            line-height: 1;
+            letter-spacing: -0.02em;
+        }
+
+        .results-metrics .m .ml {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            color: var(--accent-ink);
+            margin-top: 6px;
+        }
+
+        .results-list {
+            font-size: 16px;
+            line-height: 1.45;
+            color: var(--body);
+        }
+
+        .results-list b {
+            color: var(--accent-deep);
+        }
+
+        /* ============================================================
+           VIGNETTE BOX (KCNQ1, etc.)
+           ============================================================ */
+        .vignette {
+            border: 1px solid var(--rule-strong);
+            border-left: 4px solid var(--accent);
+            border-radius: 4px;
+            padding: 0.14in 0.20in;
+            background: var(--paper);
+            display: flex;
+            flex-direction: column;
+            gap: 0.08in;
+        }
+
+        .vignette .vh {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            color: var(--accent-ink);
+            font-weight: 500;
+        }
+
+        .vignette .ask {
+            font-family: 'Newsreader', serif;
+            font-style: italic;
+            font-size: 19px;
+            line-height: 1.4;
+            color: var(--ink);
+        }
+
+        .vignette .ans {
+            font-size: 17px;
+            line-height: 1.5;
+            color: var(--body);
+            border-top: 1px solid var(--rule);
+            padding-top: 0.10in;
+        }
+
+        .vignette .ans b {
+            color: var(--accent-deep);
+        }
+
+        /* ============================================================
+           HERD COLUMN
+           ============================================================ */
+        .herd-mark {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 0.04in;
+        }
+
+        .herd-mark img {
+            height: 38px;
+            width: auto;
+            display: block;
+        }
+
+        .herd-mark .tag {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
+            color: var(--muted);
+            border-left: 1px solid var(--rule-strong);
+            padding-left: 14px;
+            line-height: 1.4;
+        }
+
+        .feat-list {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 0.10in;
+        }
+
+        .feat-list li {
+            display: grid;
+            grid-template-columns: 0.32in 1fr;
+            column-gap: 0.14in;
+            align-items: start;
+        }
+
+        .feat-list .num {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 14px;
+            color: var(--accent-ink);
+            font-weight: 600;
+            letter-spacing: 0.06em;
+            padding-top: 5px;
+        }
+
+        .feat-list h5 {
+            font-family: 'Inter', sans-serif;
+            font-size: 19px;
+            margin: 0 0 4px 0;
+            color: var(--ink);
+            font-weight: 600;
+            letter-spacing: -0.005em;
+        }
+
+        .feat-list p {
+            font-size: 17px;
+            line-height: 1.42;
+            margin: 0;
+            color: var(--body);
+        }
+
+        /* Roadmap badge */
+        .badge {
+            display: inline-block;
+            margin-left: 8px;
+            padding: 2px 8px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            background: var(--warn-tint);
+            color: var(--warn);
+            border-radius: 3px;
+            font-weight: 500;
+            vertical-align: middle;
+        }
+
+        /* Report mock */
+        .report {
+            margin-top: 0.10in;
+            border: 1px solid var(--rule-strong);
+            border-radius: 4px;
+            background: var(--paper);
+            overflow: hidden;
+        }
+
+        .report .frame {
+            aspect-ratio: 11 / 8.5;
+            width: 100%;
+            position: relative;
+            padding: 0.20in 0.24in;
+            display: flex;
+            flex-direction: column;
+            gap: 0.06in;
+            background: linear-gradient(180deg, #FAFBFC 0%, #F2F5F8 100%);
+        }
+
+        .report .frame::before {
+            content: '';
+            position: absolute;
+            inset: 0.22in 0.26in auto 0.26in;
+            height: 2px;
+            background: var(--accent);
+        }
+
+        .report .mock-sub {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 9px;
+            letter-spacing: 0.14em;
+            color: var(--muted);
+            text-transform: uppercase;
+            margin: 0.04in 0 0 0;
+        }
+
+        .report .mock-h {
+            font-family: 'Newsreader', serif;
+            font-size: 15px;
+            color: var(--ink);
+            font-weight: 600;
+            line-height: 1.25;
+            margin: 0;
+        }
+
+        .report .mock-section {
+            margin-top: 0.06in;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .report .mock-section .h {
+            font-family: 'Inter', sans-serif;
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.10em;
+            color: var(--accent-ink);
+            margin-bottom: 4px;
+        }
+
+        .report .mock-line {
+            height: 4px;
+            border-radius: 2px;
+            background: var(--rule);
+        }
+
+        .report .mock-line.s {
+            width: 60%;
+        }
+
+        .report .mock-line.m {
+            width: 85%;
+        }
+
+        .report .mock-line.l {
+            width: 100%;
+        }
+
+        .report .placeholder-note {
+            position: absolute;
+            inset: auto 0.26in 0.18in 0.26in;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 9px;
+            color: var(--dim);
+            letter-spacing: 0.10em;
+            text-transform: uppercase;
+            text-align: center;
+            border-top: 1px dashed var(--rule);
+            padding-top: 6px;
+        }
+
+        .report-cap {
+            margin-top: 0.08in;
+            font-size: 14px;
+            color: var(--muted);
+            line-height: 1.4;
+            font-style: italic;
+        }
+
+        /* ============================================================
+           PLOTS — per-variant F1 (col 3) and bottom plot band (4-up)
+           ============================================================ */
+        .f1-plot {
+            margin-top: 0.14in;
+        }
+
+        .f1-plot svg {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+
+        .f1-plot-cap {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            color: var(--muted);
+            margin: 0.05in 0 0 0;
+            letter-spacing: 0.10em;
+            text-transform: uppercase;
+        }
+
+        .bottom-plots {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr 1fr;
+            column-gap: 0.45in;
+            padding: 0.22in 0 0.18in 0;
+            border-top: 2px solid var(--ink);
+            margin-top: 0.10in;
+        }
+
+        .plot-card {
+            display: flex;
+            flex-direction: column;
+            gap: 0.06in;
+        }
+
+        .plot-card .plot-kicker {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            color: var(--accent-ink);
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
+            font-weight: 500;
+            margin: 0;
+        }
+
+        .plot-card h4 {
+            font-family: 'Inter', sans-serif;
+            font-size: 22px;
+            font-weight: 600;
+            color: var(--ink);
+            margin: 0;
+            letter-spacing: -0.010em;
+            line-height: 1.2;
+        }
+
+        .plot-card svg {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+
+        .plot-card .plot-cap {
+            font-size: 14px;
+            color: var(--muted);
+            line-height: 1.4;
+            margin: 0;
+        }
+
+        .plot-card .plot-cap b {
+            color: var(--ink);
+            font-weight: 600;
+        }
+
+        /* ============================================================
+           CALL TO ACTION
+           ============================================================ */
+        .cta {
+            border-top: 2px solid var(--ink);
+            border-bottom: 1px solid var(--rule-strong);
+            padding: 0.16in 0;
+            display: grid;
+            grid-template-columns: 1fr auto;
+            align-items: center;
+            column-gap: 0.4in;
+        }
+
+        .cta .msg {
+            font-family: 'Newsreader', serif;
+            font-size: 30px;
+            line-height: 1.3;
+            color: var(--ink);
+            font-weight: 400;
+            letter-spacing: -0.005em;
+            max-width: 22in;
+        }
+
+        .cta .msg em {
+            color: var(--accent-ink);
+            font-style: italic;
+        }
+
+        .cta .contact {
+            text-align: right;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 16px;
+            color: var(--muted);
+            line-height: 1.6;
+            min-width: 7.5in;
+        }
+
+        .cta .contact b {
+            color: var(--ink);
+            font-weight: 600;
+            font-size: 18px;
+            display: block;
+            margin-bottom: 4px;
+        }
+
+        /* ============================================================
+           FOOTER
+           ============================================================ */
+        footer.foot {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            column-gap: 0.6in;
+            align-items: end;
+            font-size: 15px;
+            color: var(--muted);
+            line-height: 1.55;
+        }
+
+        footer.foot .ack {
+            max-width: 24in;
+        }
+
+        footer.foot .ack b {
+            color: var(--ink);
+            font-weight: 600;
+            font-size: 13px;
+            display: block;
+            margin-bottom: 5px;
+            letter-spacing: 0.16em;
+            text-transform: uppercase;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        footer.foot .logos {
+            display: flex;
+            align-items: center;
+            gap: 0.36in;
+            justify-content: flex-end;
+        }
+
+        footer.foot .logos img {
+            height: 56px;
+            width: auto;
+            display: block;
+            opacity: 0.85;
+            filter: grayscale(100%);
+        }
+
+        footer.foot .logos img.gv {
+            height: 50px;
+        }
+
+        footer.foot .logos img.herd {
+            height: 28px;
+        }
+
+        /* ============================================================
+           PRINT
+           ============================================================ */
+        @media print {
+
+            html,
+            body {
+                background: #fff;
+            }
+
+            body {
+                margin: 0;
+                padding: 0;
+            }
+
+            .stage {
+                width: var(--pw) !important;
+                height: var(--ph) !important;
+                margin: 0 !important;
+                box-shadow: none !important;
+            }
+
+            .poster {
+                transform: none !important;
+            }
+        }

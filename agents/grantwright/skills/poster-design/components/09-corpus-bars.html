@@ -1,0 +1,27 @@
+<!--
+  COMPONENT 09 — CORPUS COMPARISON BARS
+  =================================================================
+  A 3-column grid (label | bar | number) used to compare a few items
+  on a single scale. Bars use neutral gray for the comparison items
+  and accent fills for the "now" and dashed-accent for "projected".
+
+  Content fields (section: kind=corpus_bars):
+    rows[]:
+      label_html      — left label
+      width_pct       — number, percentage of bar width
+      number_html     — right-aligned numeric label
+      kind            — "neutral" | "now" | "projected"
+
+  Visual rules:
+    - bar height: 22px, 2px radius.
+    - kind=neutral → var(--rule-strong) fill
+    - kind=now     → var(--accent) fill, number in var(--accent-ink) bold
+    - kind=projected → var(--accent-tint) fill with 2px dashed accent border
+-->
+<div class="corpus">
+    {% for r in section.rows %}
+    <div class="clbl">{{ r.label_html }}</div>
+    <div class="cbar {% if r.kind == 'neutral' %}hca{% elif r.kind == 'now' %}now{% elif r.kind == 'projected' %}proj{% endif %}" style="width:{{ r.width_pct }}%"></div>
+    <div class="cnum{% if r.kind in ('now','projected') %} accent{% endif %}">{{ r.number_html }}</div>
+    {% endfor %}
+</div>

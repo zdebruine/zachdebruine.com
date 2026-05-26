@@ -1,0 +1,39 @@
+<!--
+  COMPONENT 01 — HEADER LOCKUP
+  =================================================================
+  Required. Always the first row of the poster.
+
+  Content fields:
+    meta.kicker            — short eyebrow ("Clinical Intelligence · A Framework")
+    meta.title_html        — H1, supports <em> for italicized accent words
+    meta.deck              — 1–2 sentence sub-headline (deck)
+    meta.authors_html      — primary author line
+    meta.affiliation_html  — institution(s), shown in muted gray
+    meta.venue_name_html   — conference name, 2 lines via <br/>
+    meta.venue_date        — "May 1, 2026"
+    meta.venue_location_html — multi-line institution/city
+    meta.venue_host_html   — multi-line host info (optional)
+
+  Layout: 2-column grid (lockup | meta), bottom-aligned.
+  Meta column is right-aligned, JetBrains Mono.
+-->
+<header class="head">
+    <div class="lockup">
+        <span class="kicker"><span class="dot"></span>{{ meta.kicker }}</span>
+        <h1 class="title">{{ meta.title_html }}</h1>
+        <p class="deck">{{ meta.deck }}</p>
+        <div class="authors">
+            {{ meta.authors_html }}
+            <span class="aff">{{ meta.affiliation_html }}</span>
+        </div>
+    </div>
+    <div class="meta">
+        <span class="v-name">{{ meta.venue_name_html }}</span>
+        {{ meta.venue_date }}<br/>
+        {{ meta.venue_location_html }}
+        <br/>
+        {{ meta.venue_host_html }}
+    </div>
+</header>
+
+<div class="rule"></div>

@@ -1,0 +1,27 @@
+<!--
+  COMPONENT 14 — FOOTER
+  =================================================================
+  Always the last row. Contains:
+    - Acknowledgments / funding line (italic Newsreader, muted)
+    - Logo strip (right-aligned), grayscale at 0.65 opacity
+
+  Content fields:
+    footer.acknowledgments_html  — paragraph HTML (italic)
+    footer.logos[]:
+      src                        — path relative to poster.html (e.g. "assets/gvsu.jpg")
+      alt                        — alt text
+      height_in                  — optional float; defaults vary per logo
+
+  Visual rules:
+    - 2-col grid: 1fr | auto.
+    - Logos sit on a single horizontal flex; gap 0.18in.
+    - filter: grayscale(0.55) opacity(0.85) — gives a consistent visual weight.
+-->
+<footer class="foot">
+    <div class="ack">{{ footer.acknowledgments_html }}</div>
+    <div class="logos">
+        {% for logo in footer.logos %}
+        <img src="{{ logo.src }}" alt="{{ logo.alt }}"{% if logo.height_in %} style="height:{{ logo.height_in }}in;"{% endif %}/>
+        {% endfor %}
+    </div>
+</footer>

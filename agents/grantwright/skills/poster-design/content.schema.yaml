@@ -1,0 +1,151 @@
+# poster-design / content schema
+# =====================================================================
+# This file documents every field the build.py renderer understands.
+# Use it as a checklist when authoring content.yaml. Every required
+# field is marked. Annotated example values are shown in <angle brackets>.
+# =====================================================================
+
+meta:
+  title_plain: <plain-text title for <title> element>      # REQUIRED
+  kicker: <short eyebrow, all caps in render>              # REQUIRED
+  title_html: <H1 HTML; <em>…</em> for italic accent>      # REQUIRED
+  deck: <1-2 sentence subtitle>                            # REQUIRED
+  authors_html: <author line>                              # REQUIRED
+  affiliation_html: <institution line>                     # REQUIRED
+  venue_name_html: <conference name, <br/> ok>             # REQUIRED
+  venue_date: <e.g. "May 1, 2026">                         # REQUIRED
+  venue_location_html: <city / institution>                # REQUIRED
+  venue_host_html: <host org or strap line>                # OPTIONAL
+
+# 3–4 hero stats. Numbers stay in serif; units in accent-ink sans.
+hero_stats:                                                # REQUIRED, 3 or 4 items
+  - number: <e.g. "40–60">
+    unit: <e.g. "%">
+    label_html: <one-line label; <b> allowed>
+  - number: <…>
+    unit: <…>
+    label_html: <…>
+
+# Optional full-width problem band ABOVE the 4-col body.
+# Set to null to skip.
+problem:                                                   # OPTIONAL
+  heading: <section H2>
+  index: <"00 · The gap">
+  body_html:
+    - <paragraph 1>
+    - <paragraph 2>
+  pull:
+    quote_html: <italic Newsreader pull quote>
+    cite_html: <mono uppercase attribution>
+
+# Four columns. Each column is a list of sections.
+# Total sections across all columns: 8–14 is comfortable.
+columns:                                                   # REQUIRED, length=4
+  - sections:
+      # Section kinds dispatched in build.py:
+      #   card           → 03-section-card.html
+      #   framework      → 04-framework-stack.html
+      #   results        → 05-results-card.html
+      #   vignette       → 06-vignette.html
+      #   subway         → 07-subway.html
+      #   micro_grid     → 08-micro-grid.html
+      #   corpus_bars    → 09-corpus-bars.html
+      #   svg_bar_chart  → 10-svg-bar-chart.html
+      #   feat_list      → 11-feat-list.html
+      #   mock_report    → 12-mock-report.html
+      - kind: card
+        heading: <H2>
+        index: <"01 · Why now">
+        lede_html: <Newsreader 25px lede>
+        body_html:
+          - <para>
+          - <para>
+
+      - kind: framework
+        heading: <H2>
+        index: <"02 · The framework">
+        lede_html: <lede>
+        layers:                                            # 2–5 layers
+          - id: "L1"
+            foundation: true
+            title: <H4>
+            body_html: <para>
+          - id: "L2"
+            foundation: false
+            title: <H4>
+            body_html: <para>
+
+      - kind: results
+        heading: <H2>
+        index: <"04 · Evidence">
+        title: <results card subtitle>
+        tag: <mono pill, e.g. "BMMC · 69k cells">
+        metrics:                                           # exactly 4
+          - { value: "0.933", label_html: "Mean F<sub>1</sub>" }
+          - { value: "0.94",  label_html: "Precision" }
+          - { value: "0.93",  label_html: "Recall" }
+          - { value: "0.91",  label_html: "Held-out cohort" }
+        narrative_html: <para HTML>
+        chart:                                             # OPTIONAL
+          kind: svg_bars
+          title: <a11y title>
+          x_axis_label: <"F1 score">
+          x_max: 1.0
+          mean: 0.933
+          rows:
+            - { label: "Naive B", value: 0.99, weight: "perfect" }
+            - { label: "T CD8",   value: 0.92, weight: "strong" }
+            - { label: "Mono",    value: 0.88, weight: "med" }
+            - { label: "pDC",     value: 0.71, weight: "weak" }
+
+      - kind: vignette
+        label_html: <"Worked example · KCNQ1 VUS">
+        ask_html: <italic Newsreader question>
+        ans_html: <answer paragraph; OPTIONAL>
+        accent_variant: null                               # or "deep"
+
+      - kind: subway
+        stations: [Raw, Align, Count, Store, Model, Insight]
+
+      - kind: micro_grid
+        cols: 3                                            # 2 or 3
+        cells:
+          - { label: "Input · .1fq", value: "24", unit: "%", ctx_html: "…" }
+
+      - kind: corpus_bars
+        rows:
+          - { label_html: "HCA", width_pct: 25, number_html: "1.3M cells", kind: "neutral" }
+          - { label_html: "<b>Singlet now</b>", width_pct: 60, number_html: "56k samples", kind: "now" }
+          - { label_html: "<b>Singlet 2027</b>", width_pct: 100, number_html: "1B+ cells", kind: "projected" }
+
+      - kind: feat_list
+        items:
+          - num: "01"
+            title_html: <H4>
+            badge: <optional: "Roadmap" | "Beta" | "Live">
+            body_html: <para>
+
+      - kind: mock_report
+        subhead_html: <small grey line above title>
+        title_html: <serif title inside frame>
+        sections:
+          - label: <heading>
+            lines: [s, m, l, s, m]                         # placeholder bar widths
+        placeholder_note: <OPTIONAL; "replace with assets/report.png">
+        caption_html: <italic muted caption below frame>
+
+  - sections: [ <column 2 sections> ]
+  - sections: [ <column 3 sections> ]
+  - sections: [ <column 4 sections> ]
+
+# Bottom CTA band — required.
+cta:
+  message_html: <Newsreader sentence with <em> accent>     # REQUIRED
+  contact_html: <mono block with <b>name</b>>              # REQUIRED
+
+# Footer — required.
+footer:
+  acknowledgments_html: <italic muted paragraph>           # REQUIRED
+  logos:                                                   # REQUIRED, 1+ entries
+    - { src: "assets/gvsu.jpg",  alt: "GVSU",       height_in: 0.7 }
+    - { src: "assets/herd.svg",  alt: "Herd Lab",   height_in: 0.6 }
