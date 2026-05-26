@@ -1,0 +1,56 @@
+<!--
+  COMPONENT 05 — RESULTS CARD
+  =================================================================
+  Boxed callout for headline quantitative results. Always rendered in
+  the accent tint with a 1.5px accent border. Contains:
+    - A heading + a JetBrains Mono "tag" pill on the same line
+    - A 4-column metric row (big serif numbers + tiny mono labels)
+    - A narrative paragraph
+    - An optional embedded chart (delegated to 10-svg-bar-chart.html)
+
+  Content fields (section: kind=results):
+    heading         — string (section H2)
+    index           — string ("04 · Evidence")
+    title           — string (results card subtitle)
+    tag             — string (e.g. "BMMC · 69k cells · ~70 s · 1 CPU")
+    metrics[]:
+      value         — string ("0.933")
+      label_html    — string ("Mean F<sub>1</sub>")
+    narrative_html  — paragraph(s); HTML allowed
+    chart           — optional; see 10-svg-bar-chart.html
+
+  Visual rules:
+    - background: var(--accent-tint-2)
+    - border: 1.5px solid var(--accent)
+    - 4 metric tiles separated by translucent accent vertical rules
+    - Mean F1 is the canonical first metric; precision/recall/held-out next
+-->
+<section class="card">
+    <h2 class="section-h">
+        <span>{{ section.heading }}</span>
+        <span class="ix">{{ section.index }}</span>
+    </h2>
+
+    <div class="results-card">
+        <div class="results-head">
+            <h3>{{ section.title }}</h3>
+            <span class="tag">{{ section.tag }}</span>
+        </div>
+
+        <div class="results-metrics">
+            {% for m in section.metrics %}
+            <div class="m">
+                <div class="mn">{{ m.value }}</div>
+                <div class="ml">{{ m.label_html }}</div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="results-list">
+            {{ section.narrative_html }}
+            {% if section.chart %}
+            {% include "10-svg-bar-chart.html" %}
+            {% endif %}
+        </div>
+    </div>
+</section>

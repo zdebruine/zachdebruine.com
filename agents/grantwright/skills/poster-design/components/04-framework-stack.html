@@ -1,0 +1,47 @@
+<!--
+  COMPONENT 04 — FRAMEWORK STACK (L1 → L4)
+  =================================================================
+  A vertically-stacked sequence of capability layers, connected by
+  downward arrows. The first (foundational) layer is highlighted with
+  the accent tint background and a 2-px accent border.
+
+  Content fields (section: kind=framework):
+    heading       — string
+    index         — string
+    lede_html     — opening serif paragraph
+    layers[]:
+      id          — "L1", "L2", ...
+      foundation  — bool (true marks the highlighted layer)
+      title       — string (H4)
+      body_html   — paragraph HTML; can include <span class="mono"> for code-ish tokens
+
+  Visual rules:
+    - Foundation layer: var(--accent-tint-2) bg, 2px accent border.
+    - Other layers: white bg, 1.5px var(--rule-strong) border.
+    - 0.55in left column for the "L1" index in JetBrains Mono 18px accent-ink.
+    - ↓ arrows between layers (single character, accent color, 22px).
+-->
+<section class="card">
+    <h2 class="section-h">
+        <span>{{ section.heading }}</span>
+        <span class="ix">{{ section.index }}</span>
+    </h2>
+    {% if section.lede_html %}
+    <p class="lede">{{ section.lede_html }}</p>
+    {% endif %}
+
+    <div class="framework">
+        {% for layer in section.layers %}
+        <div class="layer{% if layer.foundation %} foundation{% endif %}">
+            <div class="ix">{{ layer.id }}</div>
+            <div>
+                <h4>{{ layer.title }}</h4>
+                <p>{{ layer.body_html }}</p>
+            </div>
+        </div>
+        {% if not loop.last %}
+        <div class="arrow">&darr;</div>
+        {% endif %}
+        {% endfor %}
+    </div>
+</section>

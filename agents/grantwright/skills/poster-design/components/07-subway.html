@@ -1,0 +1,21 @@
+<!--
+  COMPONENT 07 — SUBWAY DIAGRAM
+  =================================================================
+  Horizontal pipeline of stations connected by accent-colored segments.
+  Each station has a 14-px accent pip and an uppercase mono label.
+
+  Content fields (section: kind=subway):
+    stations[]    — array of strings (e.g. ["Raw", "Align", "Count", "Store", "Model", "Insight"])
+
+  Visual rules:
+    - Pip: 14px solid var(--accent).
+    - Segment: 2px high var(--accent), flex:1.
+    - Labels: JetBrains Mono 13px, 0.14em letter-spacing, uppercase, muted.
+    - Number of stations: 4–8 is comfortable; 6 is canonical.
+-->
+<div class="subway" aria-hidden="true">
+    {% for st in section.stations %}
+    <div class="station"><div class="pip"></div><div class="lbl">{{ st }}</div></div>
+    {% if not loop.last %}<div class="seg"></div>{% endif %}
+    {% endfor %}
+</div>

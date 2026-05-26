@@ -1,0 +1,43 @@
+<!--
+  COMPONENT 12 — MOCK REPORT
+  =================================================================
+  A small framed mock of a deliverable (PDF report, dashboard, etc.)
+  with placeholder lines simulating real content. Useful when you want
+  to show that a workflow produces an artifact without revealing PHI.
+
+  Content fields (section: kind=mock_report):
+    title_html       — main H + subtitle inside the report frame
+    sections[]:
+      label          — section heading inside the report
+      lines          — array of "s" | "m" | "l" (short/medium/long placeholder bars)
+    placeholder_note — optional; e.g. "replace with real screenshot · assets/report.png"
+    caption_html     — italic muted caption below the frame
+
+  Visual rules:
+    - aspect-ratio: 11/8.5 (US Letter portrait).
+    - Top accent rule (2px), gradient background, mono subhead, serif title.
+    - Section headings: Inter 10px 700, uppercase, var(--accent-ink).
+    - Placeholder bars: 4px high, var(--rule), 60/85/100% widths.
+-->
+<div class="report">
+    <div class="frame">
+        <p class="mock-sub">{{ section.subhead_html }}</p>
+        <p class="mock-h">{{ section.title_html }}</p>
+
+        {% for s in section.sections %}
+        <div class="mock-section">
+            <span class="h">{{ s.label }}</span>
+            {% for ln in s.lines %}
+            <div class="mock-line {{ ln }}"></div>
+            {% endfor %}
+        </div>
+        {% endfor %}
+
+        {% if section.placeholder_note %}
+        <p class="placeholder-note">{{ section.placeholder_note }}</p>
+        {% endif %}
+    </div>
+</div>
+{% if section.caption_html %}
+<p class="report-cap">{{ section.caption_html }}</p>
+{% endif %}

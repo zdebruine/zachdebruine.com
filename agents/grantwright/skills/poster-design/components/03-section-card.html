@@ -1,0 +1,30 @@
+<!--
+  COMPONENT 03 — SECTION CARD
+  =================================================================
+  The basic content unit. Used in every column for prose sections.
+
+  Content fields (section: kind=card):
+    heading        — string ("The clinical genetics gap.")
+    index          — string ("01 · Why now"), JetBrains Mono uppercase
+    lede_html      — opening serif paragraph (Newsreader 25px)
+    body_html      — array of paragraph HTML strings (Inter 19px / 1.45)
+
+  Visual rules:
+    - Section heading has a 2-px ink bottom-border.
+    - Index sits flush-right on the same baseline as the heading.
+    - Lede is Newsreader 25px italic-friendly; can use <em> for accent.
+    - Subsequent paragraphs are Inter 19px / 1.45.
+    - Use <em> sparingly — at most twice per section.
+-->
+<section class="card">
+    <h2 class="section-h">
+        <span>{{ section.heading }}</span>
+        <span class="ix">{{ section.index }}</span>
+    </h2>
+    {% if section.lede_html %}
+    <p class="lede">{{ section.lede_html }}</p>
+    {% endif %}
+    {% for para in section.body_html %}
+    <p>{{ para }}</p>
+    {% endfor %}
+</section>

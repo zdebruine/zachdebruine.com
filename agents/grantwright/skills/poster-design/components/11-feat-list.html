@@ -1,0 +1,30 @@
+<!--
+  COMPONENT 11 — FEATURE LIST
+  =================================================================
+  Numbered list with mono indices and optional "Roadmap" / "Beta" badges
+  on the H4 title.
+
+  Content fields (section: kind=feat_list):
+    items[]:
+      num            — string ("01")
+      title_html     — H4 title; may end with a badge span
+      badge          — optional: "Roadmap", "Beta", "Live" (rendered in warn-tint)
+      body_html      — paragraph HTML
+
+  Visual rules:
+    - Each item: 2-col grid (0.32in num | 1fr body).
+    - num: JetBrains Mono 14px, accent-ink, 0.06em letter-spacing, bold.
+    - title: Inter 19px 600 weight.
+    - badge: JetBrains Mono 11px uppercase, var(--warn-tint) bg, var(--warn) ink.
+-->
+<ul class="feat-list">
+    {% for item in section.items %}
+    <li>
+        <span class="num">{{ item.num }}</span>
+        <div>
+            <h4>{{ item.title_html }}{% if item.badge %} <span class="badge">{{ item.badge }}</span>{% endif %}</h4>
+            <p>{{ item.body_html }}</p>
+        </div>
+    </li>
+    {% endfor %}
+</ul>

@@ -1,0 +1,1856 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Clinical Intelligence — A framework for phenotype-grounded AI in clinical genetics</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,wght@0,400;0,500;0,600;1,400;1,500&display=swap"
+        rel="stylesheet" />
+
+    <style>
+        /* =================================================================
+           CLINICAL INTELLIGENCE — Michigan Clinical Genetics Conference 2026
+           36 in (W) × 48 in (H) portrait. Minimalist, white background,
+           single accent (Herd cyan). Hairline rules, generous whitespace,
+           Newsreader serif headings, Inter body, JetBrains Mono labels.
+
+           Layout strategy:
+           - .stage is the on-screen-sized wrapper (occupies actual scaled
+             pixel area so scrollbars match what's visible).
+           - .poster has true print dimensions (36in × 48in = 3456 × 4608 px
+             at 96 dpi) and is scaled via CSS transform.
+           - JS sets --scale on resize. @media print resets to 1.0.
+           ================================================================= */
+
+        :root {
+            /* True print dimensions, in CSS inches — landscape */
+            --pw: 48in;
+            --ph: 36in;
+            --scale: 0.32;
+
+            /* Color tokens */
+            --ink: #0F1419;
+            --body: #2A2F36;
+            --muted: #5C6470;
+            --dim: #8A93A0;
+            --rule: #E2E5EA;
+            --rule-strong: #C2C7CF;
+            --paper: #FFFFFF;
+            --tint: #F6F8FA;
+            --tint-2: #EEF2F5;
+
+            /* Single accent: a calmer Herd cyan */
+            --accent: #0EA5C2;
+            --accent-ink: #0B6E83;
+            --accent-deep: #084C5C;
+            --accent-tint: #E6F6FA;
+            --accent-tint-2: #F2FBFD;
+
+            /* Subtle warning/clinical contrast — used sparingly */
+            --warn: #B45309;
+            --warn-tint: #FEF7EC;
+        }
+
+        @page {
+            size: 48in 36in;
+            margin: 0;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            margin: 0;
+            padding: 0;
+            background: #E9ECEF;
+            font-family: 'Inter', system-ui, sans-serif;
+            color: var(--body);
+            -webkit-font-smoothing: antialiased;
+            text-rendering: geometricPrecision;
+        }
+
+        /* ----- Stage wrapper takes the scaled visual size ------------- */
+        .stage {
+            width: calc(var(--pw) * var(--scale));
+            height: calc(var(--ph) * var(--scale));
+            position: relative;
+            margin: 24px auto 48px;
+            box-shadow:
+                0 0 0 1px rgba(0, 0, 0, 0.06),
+                0 60px 80px -40px rgba(0, 0, 0, 0.18);
+        }
+
+        /* ----- Poster itself: full print dimensions ------------------- */
+        .poster {
+            width: var(--pw);
+            height: var(--ph);
+            background: var(--paper);
+            color: var(--ink);
+            position: absolute;
+            top: 0;
+            left: 0;
+            transform: scale(var(--scale));
+            transform-origin: top left;
+            overflow: hidden;
+            padding: 0.65in 0.85in 0.55in 0.85in;
+            display: grid;
+            grid-template-rows: auto 4px auto auto auto auto auto;
+            row-gap: 0.22in;
+        }
+
+        /* Subtle accent watermark in lower-right corner */
+        .poster::after {
+            content: '';
+            position: absolute;
+            right: -8in;
+            bottom: -8in;
+            width: 22in;
+            height: 22in;
+            border-radius: 50%;
+            background: radial-gradient(closest-side, var(--accent-tint), transparent 70%);
+            pointer-events: none;
+            z-index: 0;
+            opacity: 0.55;
+        }
+
+        .poster>* {
+            position: relative;
+            z-index: 1;
+        }
+
+        /* ============================================================
+           TYPOGRAPHY
+           ============================================================ */
+        .kicker {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 24px;
+            letter-spacing: 0.20em;
+            text-transform: uppercase;
+            color: var(--accent-ink);
+            font-weight: 500;
+            display: inline-flex;
+            align-items: center;
+            gap: 18px;
+        }
+
+        .kicker .dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: var(--accent);
+        }
+
+        h1.title {
+            font-family: 'Newsreader', 'Inter', serif;
+            font-weight: 500;
+            font-size: 116px;
+            line-height: 1.0;
+            letter-spacing: -0.020em;
+            margin: 0;
+            color: var(--ink);
+            max-width: 36in;
+        }
+
+        h1.title em {
+            font-style: italic;
+            font-weight: 500;
+            color: var(--accent-ink);
+        }
+
+        .deck {
+            font-size: 28px;
+            line-height: 1.32;
+            color: var(--muted);
+            font-weight: 400;
+            max-width: 34in;
+            margin: 0.16in 0 0 0;
+            letter-spacing: -0.005em;
+        }
+
+        h2.section-h {
+            font-family: 'Inter', sans-serif;
+            font-size: 38px;
+            font-weight: 600;
+            letter-spacing: -0.012em;
+            color: var(--ink);
+            margin: 0;
+            padding-bottom: 0.12in;
+            border-bottom: 2px solid var(--ink);
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            gap: 16px;
+        }
+
+        h2.section-h .ix {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 16px;
+            letter-spacing: 0.18em;
+            color: var(--accent-ink);
+            font-weight: 500;
+            text-transform: uppercase;
+        }
+
+        h3 {
+            font-family: 'Inter', sans-serif;
+            font-size: 24px;
+            font-weight: 600;
+            letter-spacing: -0.008em;
+            margin: 0 0 0.08in 0;
+            color: var(--ink);
+        }
+
+        h4 {
+            font-family: 'Inter', sans-serif;
+            font-size: 19px;
+            font-weight: 600;
+            margin: 0 0 4px 0;
+            color: var(--ink);
+            letter-spacing: -0.005em;
+        }
+
+        p {
+            margin: 0;
+            font-size: 19px;
+            line-height: 1.45;
+            color: var(--body);
+        }
+
+        p+p {
+            margin-top: 0.10in;
+        }
+
+        .lede {
+            font-family: 'Newsreader', serif;
+            font-weight: 400;
+            font-size: 25px;
+            line-height: 1.38;
+            color: var(--ink);
+            letter-spacing: -0.005em;
+        }
+
+        .lede em {
+            color: var(--accent-ink);
+            font-style: italic;
+        }
+
+        small,
+        .meta-text {
+            font-size: 15px;
+            color: var(--muted);
+            line-height: 1.4;
+        }
+
+        b,
+        strong {
+            color: var(--ink);
+            font-weight: 600;
+        }
+
+        .mono {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.92em;
+        }
+
+        /* ============================================================
+           HEADER
+           ============================================================ */
+        header.head {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            column-gap: 0.7in;
+            align-items: end;
+        }
+
+        header.head .lockup {
+            display: flex;
+            flex-direction: column;
+            gap: 0.18in;
+        }
+
+        header.head .meta {
+            text-align: right;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 18px;
+            line-height: 1.55;
+            color: var(--muted);
+            min-width: 8.5in;
+        }
+
+        header.head .meta .v-name {
+            font-family: 'Inter', sans-serif;
+            color: var(--ink);
+            font-weight: 600;
+            display: block;
+            font-size: 22px;
+            letter-spacing: -0.005em;
+            text-transform: none;
+        }
+
+        header.head .authors {
+            margin-top: 0.18in;
+            font-size: 28px;
+            color: var(--ink);
+            font-weight: 500;
+            letter-spacing: -0.005em;
+        }
+
+        header.head .authors .aff {
+            color: var(--muted);
+            font-weight: 400;
+            font-size: 22px;
+            display: block;
+            margin-top: 4px;
+        }
+
+        .rule {
+            border-top: 1px solid var(--rule-strong);
+            grid-column: 1 / -1;
+            height: 0;
+        }
+
+        /* ============================================================
+           HERO STAT BAND
+           ============================================================ */
+        .hero-stats {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 0;
+            border-top: 2px solid var(--ink);
+            border-bottom: 1px solid var(--rule-strong);
+            padding: 0.16in 0;
+        }
+
+        .hero-stats .stat {
+            padding: 0 0.30in;
+            border-right: 1px solid var(--rule);
+        }
+
+        .hero-stats .stat:first-child {
+            padding-left: 0;
+        }
+
+        .hero-stats .stat:last-child {
+            border-right: none;
+            padding-right: 0;
+        }
+
+        .hero-stats .stat .n {
+            font-family: 'Newsreader', serif;
+            font-weight: 500;
+            font-size: 70px;
+            line-height: 0.95;
+            color: var(--ink);
+            letter-spacing: -0.025em;
+        }
+
+        .hero-stats .stat .n .u {
+            font-family: 'Inter', sans-serif;
+            font-weight: 600;
+            font-size: 38px;
+            color: var(--accent-ink);
+            letter-spacing: -0.005em;
+            margin-left: 4px;
+        }
+
+        .hero-stats .stat .l {
+            font-family: 'Inter', sans-serif;
+            font-size: 17px;
+            color: var(--muted);
+            line-height: 1.4;
+            margin-top: 0.10in;
+            max-width: 7in;
+        }
+
+        .hero-stats .stat .l b {
+            color: var(--ink);
+        }
+
+        /* ============================================================
+           PROBLEM BAND (clinical motivation)
+           ============================================================ */
+        .problem {
+            display: grid;
+            grid-template-columns: 1fr 1.3fr;
+            column-gap: 0.55in;
+            align-items: start;
+        }
+
+        .problem .copy h2 {
+            margin-bottom: 0.18in;
+        }
+
+        .problem .copy p {
+            font-size: 21px;
+        }
+
+        .problem .pull {
+            border-left: 4px solid var(--accent);
+            padding-left: 0.22in;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .problem .pull .quote {
+            font-family: 'Newsreader', serif;
+            font-style: italic;
+            font-size: 30px;
+            line-height: 1.32;
+            color: var(--ink);
+            letter-spacing: -0.005em;
+        }
+
+        .problem .pull cite {
+            display: block;
+            margin-top: 0.12in;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 14px;
+            letter-spacing: 0.16em;
+            text-transform: uppercase;
+            color: var(--muted);
+            font-style: normal;
+        }
+
+        /* ============================================================
+           FOUR-COLUMN MAIN BODY
+           Cols 2 + 3 are visually a single "central panel" so we can
+           merge them when content runs wide.
+           ============================================================ */
+        .body {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr 1fr;
+            column-gap: 0.45in;
+            row-gap: 0;
+            align-items: start;
+            position: relative;
+        }
+
+        /* Hairline column gutters — quietly reinforce the 4-up rhythm. */
+        .body::before,
+        .body::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 1px;
+            background: var(--rule);
+        }
+
+        .body::before {
+            left: calc(25% - 0.225in / 2);
+        }
+
+        .body::after {
+            left: calc(75% - 0.225in / 2);
+        }
+
+        /* Subtle separator between the merged middle pair (col 2 | col 3). */
+        .body .midrule {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            left: calc(50% - 0.5px);
+            width: 1px;
+            background: var(--rule);
+        }
+
+        .col {
+            display: flex;
+            flex-direction: column;
+            gap: 0.28in;
+        }
+
+        section.card {
+            display: flex;
+            flex-direction: column;
+            gap: 0.14in;
+        }
+
+        /* ============================================================
+           SUBWAY (build pipeline)
+           ============================================================ */
+        .subway {
+            display: flex;
+            align-items: center;
+            gap: 0;
+            margin: 0.05in 0;
+        }
+
+        .subway .station {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            min-width: 0;
+        }
+
+        .subway .station .pip {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: var(--accent);
+        }
+
+        .subway .station .lbl {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            letter-spacing: 0.14em;
+            color: var(--muted);
+            text-transform: uppercase;
+            white-space: nowrap;
+        }
+
+        .subway .seg {
+            flex: 1;
+            height: 2px;
+            background: var(--accent);
+        }
+
+        /* ============================================================
+           PIPELINE BENCH MICRO-CARDS
+           ============================================================ */
+        .micro-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 0.16in;
+            margin-top: 0.06in;
+        }
+
+        .micro {
+            border: 1px solid var(--rule-strong);
+            border-radius: 4px;
+            padding: 0.14in 0.16in;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            background: var(--paper);
+        }
+
+        .micro .lab {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            color: var(--muted);
+        }
+
+        .micro .v {
+            font-family: 'Newsreader', serif;
+            font-size: 32px;
+            font-weight: 500;
+            color: var(--accent-ink);
+            line-height: 1.05;
+            letter-spacing: -0.015em;
+        }
+
+        .micro .v .u {
+            font-family: 'Inter', sans-serif;
+            font-size: 16px;
+            color: var(--accent-ink);
+            margin-left: 2px;
+            font-weight: 600;
+        }
+
+        .micro .ctx {
+            font-size: 14px;
+            color: var(--muted);
+            line-height: 1.4;
+        }
+
+        /* ============================================================
+           HORIZONTAL BAR CHART (GPU speedups)
+           ============================================================ */
+        .gpu-chart {
+            margin-top: 0.08in;
+            display: grid;
+            grid-template-columns: 2.4in 1fr auto;
+            row-gap: 9px;
+            column-gap: 0.16in;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 14px;
+            color: var(--ink);
+            align-items: center;
+        }
+
+        .gpu-chart .row {
+            display: contents;
+        }
+
+        .gpu-chart .lbl {
+            color: var(--ink);
+            font-weight: 500;
+        }
+
+        .gpu-chart .bar {
+            height: 14px;
+            background: var(--accent);
+            border-radius: 1.5px;
+        }
+
+        .gpu-chart .bar.lite {
+            background: var(--accent-tint);
+            border: 1px solid var(--accent);
+        }
+
+        .gpu-chart .num {
+            color: var(--accent-ink);
+            font-weight: 600;
+            white-space: nowrap;
+            text-align: right;
+        }
+
+        .gpu-chart .axis-note {
+            grid-column: 1 / -1;
+            font-size: 12px;
+            color: var(--muted);
+            font-family: 'Inter', sans-serif;
+            margin-top: 6px;
+            font-style: italic;
+        }
+
+        /* ============================================================
+           CORPUS COMPARISON
+           ============================================================ */
+        .corpus {
+            display: grid;
+            grid-template-columns: 1.4in 1fr auto;
+            column-gap: 0.18in;
+            row-gap: 10px;
+            align-items: center;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 14px;
+        }
+
+        .corpus .clbl {
+            color: var(--ink);
+            font-weight: 500;
+        }
+
+        .corpus .cbar {
+            height: 22px;
+            border-radius: 2px;
+        }
+
+        .corpus .cbar.hca {
+            background: var(--rule-strong);
+        }
+
+        .corpus .cbar.cxg {
+            background: var(--rule-strong);
+        }
+
+        .corpus .cbar.now {
+            background: var(--accent);
+        }
+
+        .corpus .cbar.proj {
+            background: var(--accent-tint);
+            border: 2px dashed var(--accent);
+        }
+
+        .corpus .cnum {
+            font-weight: 600;
+            color: var(--ink);
+            white-space: nowrap;
+        }
+
+        .corpus .cnum.accent {
+            color: var(--accent-ink);
+        }
+
+        /* ============================================================
+           FRAMEWORK STACK (L1 → L4)
+           ============================================================ */
+        .framework {
+            display: flex;
+            flex-direction: column;
+            gap: 0.12in;
+        }
+
+        .layer {
+            border: 1.5px solid var(--rule-strong);
+            border-radius: 6px;
+            padding: 0.13in 0.18in;
+            display: grid;
+            grid-template-columns: 0.55in 1fr;
+            column-gap: 0.18in;
+            align-items: start;
+            background: var(--paper);
+        }
+
+        .layer.foundation {
+            background: var(--accent-tint-2);
+            border-color: var(--accent);
+            border-width: 2px;
+        }
+
+        .layer .ix {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 18px;
+            color: var(--accent-ink);
+            font-weight: 600;
+            letter-spacing: 0.04em;
+            padding-top: 4px;
+        }
+
+        .layer h4 {
+            font-size: 21px;
+        }
+
+        .layer p {
+            font-size: 16px;
+            line-height: 1.40;
+            color: var(--body);
+        }
+
+        .arrow {
+            display: flex;
+            justify-content: center;
+            color: var(--accent);
+            font-size: 22px;
+            font-weight: 300;
+            line-height: 0.4;
+            margin: -2px 0;
+        }
+
+        /* ============================================================
+           VALIDATION TABLE
+           ============================================================ */
+        .results-card {
+            background: var(--accent-tint-2);
+            border: 1.5px solid var(--accent);
+            border-radius: 6px;
+            padding: 0.16in 0.20in;
+            display: flex;
+            flex-direction: column;
+            gap: 0.10in;
+        }
+
+        .results-head {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            gap: 16px;
+        }
+
+        .results-head h3 {
+            font-size: 22px;
+            margin: 0;
+            color: var(--accent-deep);
+        }
+
+        .results-head .tag {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            letter-spacing: 0.16em;
+            text-transform: uppercase;
+            color: var(--accent-ink);
+            font-weight: 500;
+        }
+
+        .results-metrics {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 0;
+            border-top: 1px solid var(--accent);
+            border-bottom: 1px solid var(--accent);
+            padding: 0.12in 0;
+        }
+
+        .results-metrics .m {
+            padding: 0 0.14in;
+            border-right: 1px solid rgba(14, 165, 194, 0.3);
+        }
+
+        .results-metrics .m:first-child {
+            padding-left: 0;
+        }
+
+        .results-metrics .m:last-child {
+            border-right: none;
+            padding-right: 0;
+        }
+
+        .results-metrics .m .mn {
+            font-family: 'Newsreader', serif;
+            font-size: 36px;
+            font-weight: 500;
+            color: var(--accent-deep);
+            line-height: 1;
+            letter-spacing: -0.02em;
+        }
+
+        .results-metrics .m .ml {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            color: var(--accent-ink);
+            margin-top: 6px;
+        }
+
+        .results-list {
+            font-size: 16px;
+            line-height: 1.45;
+            color: var(--body);
+        }
+
+        .results-list b {
+            color: var(--accent-deep);
+        }
+
+        /* ============================================================
+           VIGNETTE BOX (KCNQ1, etc.)
+           ============================================================ */
+        .vignette {
+            border: 1px solid var(--rule-strong);
+            border-left: 4px solid var(--accent);
+            border-radius: 4px;
+            padding: 0.14in 0.20in;
+            background: var(--paper);
+            display: flex;
+            flex-direction: column;
+            gap: 0.08in;
+        }
+
+        .vignette .vh {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            color: var(--accent-ink);
+            font-weight: 500;
+        }
+
+        .vignette .ask {
+            font-family: 'Newsreader', serif;
+            font-style: italic;
+            font-size: 19px;
+            line-height: 1.4;
+            color: var(--ink);
+        }
+
+        .vignette .ans {
+            font-size: 17px;
+            line-height: 1.5;
+            color: var(--body);
+            border-top: 1px solid var(--rule);
+            padding-top: 0.10in;
+        }
+
+        .vignette .ans b {
+            color: var(--accent-deep);
+        }
+
+        /* ============================================================
+           HERD COLUMN
+           ============================================================ */
+        .herd-mark {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 0.04in;
+        }
+
+        .herd-mark img {
+            height: 38px;
+            width: auto;
+            display: block;
+        }
+
+        .herd-mark .tag {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
+            color: var(--muted);
+            border-left: 1px solid var(--rule-strong);
+            padding-left: 14px;
+            line-height: 1.4;
+        }
+
+        .feat-list {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 0.10in;
+        }
+
+        .feat-list li {
+            display: grid;
+            grid-template-columns: 0.32in 1fr;
+            column-gap: 0.14in;
+            align-items: start;
+        }
+
+        .feat-list .num {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 14px;
+            color: var(--accent-ink);
+            font-weight: 600;
+            letter-spacing: 0.06em;
+            padding-top: 5px;
+        }
+
+        .feat-list h5 {
+            font-family: 'Inter', sans-serif;
+            font-size: 19px;
+            margin: 0 0 4px 0;
+            color: var(--ink);
+            font-weight: 600;
+            letter-spacing: -0.005em;
+        }
+
+        .feat-list p {
+            font-size: 17px;
+            line-height: 1.42;
+            margin: 0;
+            color: var(--body);
+        }
+
+        /* Roadmap badge */
+        .badge {
+            display: inline-block;
+            margin-left: 8px;
+            padding: 2px 8px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            background: var(--warn-tint);
+            color: var(--warn);
+            border-radius: 3px;
+            font-weight: 500;
+            vertical-align: middle;
+        }
+
+        /* Report mock */
+        .report {
+            margin-top: 0.10in;
+            border: 1px solid var(--rule-strong);
+            border-radius: 4px;
+            background: var(--paper);
+            overflow: hidden;
+        }
+
+        .report .frame {
+            aspect-ratio: 11 / 8.5;
+            width: 100%;
+            position: relative;
+            padding: 0.20in 0.24in;
+            display: flex;
+            flex-direction: column;
+            gap: 0.06in;
+            background: linear-gradient(180deg, #FAFBFC 0%, #F2F5F8 100%);
+        }
+
+        .report .frame::before {
+            content: '';
+            position: absolute;
+            inset: 0.22in 0.26in auto 0.26in;
+            height: 2px;
+            background: var(--accent);
+        }
+
+        .report .mock-sub {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 9px;
+            letter-spacing: 0.14em;
+            color: var(--muted);
+            text-transform: uppercase;
+            margin: 0.04in 0 0 0;
+        }
+
+        .report .mock-h {
+            font-family: 'Newsreader', serif;
+            font-size: 15px;
+            color: var(--ink);
+            font-weight: 600;
+            line-height: 1.25;
+            margin: 0;
+        }
+
+        .report .mock-section {
+            margin-top: 0.06in;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .report .mock-section .h {
+            font-family: 'Inter', sans-serif;
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.10em;
+            color: var(--accent-ink);
+            margin-bottom: 4px;
+        }
+
+        .report .mock-line {
+            height: 4px;
+            border-radius: 2px;
+            background: var(--rule);
+        }
+
+        .report .mock-line.s {
+            width: 60%;
+        }
+
+        .report .mock-line.m {
+            width: 85%;
+        }
+
+        .report .mock-line.l {
+            width: 100%;
+        }
+
+        .report .placeholder-note {
+            position: absolute;
+            inset: auto 0.26in 0.18in 0.26in;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 9px;
+            color: var(--dim);
+            letter-spacing: 0.10em;
+            text-transform: uppercase;
+            text-align: center;
+            border-top: 1px dashed var(--rule);
+            padding-top: 6px;
+        }
+
+        .report-cap {
+            margin-top: 0.08in;
+            font-size: 14px;
+            color: var(--muted);
+            line-height: 1.4;
+            font-style: italic;
+        }
+
+        /* ============================================================
+           PLOTS — per-variant F1 (col 3) and bottom plot band (4-up)
+           ============================================================ */
+        .f1-plot {
+            margin-top: 0.14in;
+        }
+
+        .f1-plot svg {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+
+        .f1-plot-cap {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            color: var(--muted);
+            margin: 0.05in 0 0 0;
+            letter-spacing: 0.10em;
+            text-transform: uppercase;
+        }
+
+        .bottom-plots {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr 1fr;
+            column-gap: 0.45in;
+            padding: 0.22in 0 0.18in 0;
+            border-top: 2px solid var(--ink);
+            margin-top: 0.10in;
+        }
+
+        .plot-card {
+            display: flex;
+            flex-direction: column;
+            gap: 0.06in;
+        }
+
+        .plot-card .plot-kicker {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            color: var(--accent-ink);
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
+            font-weight: 500;
+            margin: 0;
+        }
+
+        .plot-card h4 {
+            font-family: 'Inter', sans-serif;
+            font-size: 22px;
+            font-weight: 600;
+            color: var(--ink);
+            margin: 0;
+            letter-spacing: -0.010em;
+            line-height: 1.2;
+        }
+
+        .plot-card svg {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+
+        .plot-card .plot-cap {
+            font-size: 14px;
+            color: var(--muted);
+            line-height: 1.4;
+            margin: 0;
+        }
+
+        .plot-card .plot-cap b {
+            color: var(--ink);
+            font-weight: 600;
+        }
+
+        /* ============================================================
+           CALL TO ACTION
+           ============================================================ */
+        .cta {
+            border-top: 2px solid var(--ink);
+            border-bottom: 1px solid var(--rule-strong);
+            padding: 0.16in 0;
+            display: grid;
+            grid-template-columns: 1fr auto;
+            align-items: center;
+            column-gap: 0.4in;
+        }
+
+        .cta .msg {
+            font-family: 'Newsreader', serif;
+            font-size: 30px;
+            line-height: 1.3;
+            color: var(--ink);
+            font-weight: 400;
+            letter-spacing: -0.005em;
+            max-width: 22in;
+        }
+
+        .cta .msg em {
+            color: var(--accent-ink);
+            font-style: italic;
+        }
+
+        .cta .contact {
+            text-align: right;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 16px;
+            color: var(--muted);
+            line-height: 1.6;
+            min-width: 7.5in;
+        }
+
+        .cta .contact b {
+            color: var(--ink);
+            font-weight: 600;
+            font-size: 18px;
+            display: block;
+            margin-bottom: 4px;
+        }
+
+        /* ============================================================
+           FOOTER
+           ============================================================ */
+        footer.foot {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            column-gap: 0.6in;
+            align-items: end;
+            font-size: 15px;
+            color: var(--muted);
+            line-height: 1.55;
+        }
+
+        footer.foot .ack {
+            max-width: 24in;
+        }
+
+        footer.foot .ack b {
+            color: var(--ink);
+            font-weight: 600;
+            font-size: 13px;
+            display: block;
+            margin-bottom: 5px;
+            letter-spacing: 0.16em;
+            text-transform: uppercase;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        footer.foot .logos {
+            display: flex;
+            align-items: center;
+            gap: 0.36in;
+            justify-content: flex-end;
+        }
+
+        footer.foot .logos img {
+            height: 56px;
+            width: auto;
+            display: block;
+            opacity: 0.85;
+            filter: grayscale(100%);
+        }
+
+        footer.foot .logos img.gv {
+            height: 50px;
+        }
+
+        footer.foot .logos img.herd {
+            height: 28px;
+        }
+
+        /* ============================================================
+           PRINT
+           ============================================================ */
+        @media print {
+
+            html,
+            body {
+                background: #fff;
+            }
+
+            body {
+                margin: 0;
+                padding: 0;
+            }
+
+            .stage {
+                width: var(--pw) !important;
+                height: var(--ph) !important;
+                margin: 0 !important;
+                box-shadow: none !important;
+            }
+
+            .poster {
+                transform: none !important;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="stage" id="stage">
+        <article class="poster">
+
+            <!-- ====================================================
+                 HEADER
+                 ==================================================== -->
+            <header class="head">
+                <div class="lockup">
+                    <span class="kicker"><span class="dot"></span>Clinical Intelligence · A Framework</span>
+                    <h1 class="title">From a billion cells to a bedside <em>diagnosis</em>.</h1>
+                    <p class="deck">
+                        Phenotype-grounded AI for clinical genetics &mdash; built on the literature first,
+                        the chart second, and omics as evidence. A working substrate, validated on real
+                        disease variants, with a HIPAA-compliant translation layer for the clinic.
+                    </p>
+                    <div class="authors">
+                        Zach DeBruine, PhD
+                        <span class="aff">Assistant Professor of Bioinformatics &middot; Grand Valley State
+                            University &nbsp;·&nbsp; Applied Computing &amp; Informatics Institute</span>
+                    </div>
+                </div>
+                <div class="meta">
+                    <span class="v-name">Michigan Clinical Genetics<br />Conference 2026</span>
+                    May 1, 2026<br />
+                    MSU College of Human Medicine<br />
+                    Grand Rapids, MI<br />
+                    <br />
+                    Hosted by Caleb P. Bupp, MD<br />
+                    Chief, Clinical Genetics<br />
+                    Corewell Health
+                </div>
+            </header>
+
+            <div class="rule"></div>
+
+            <!-- ====================================================
+                 HERO STAT BAND — clinical motivation
+                 ==================================================== -->
+            <div class="hero-stats">
+                <div class="stat">
+                    <div class="n">40&ndash;60<span class="u">%</span></div>
+                    <div class="l">of clinical whole-genome sequences yield a <b>variant of uncertain
+                            significance</b>.
+                    </div>
+                </div>
+                <div class="stat">
+                    <div class="n">5&ndash;7<span class="u">yr</span></div>
+                    <div class="l">average <b>diagnostic odyssey</b> for a rare disease, at $100K+ in workup
+                        costs.
+                    </div>
+                </div>
+                <div class="stat">
+                    <div class="n">1<span class="u">&nbsp;in&nbsp;10</span></div>
+                    <div class="l">Americans live with a <b>rare disease</b> &mdash; 25&ndash;30 million people.
+                    </div>
+                </div>
+                <div class="stat">
+                    <div class="n">2.17<span class="u">&nbsp;PB</span></div>
+                    <div class="l">of <b>single-cell reads in SRA</b>, fragmented across 9,937 studies and 7
+                        toolchains.</div>
+                </div>
+            </div>
+
+            <!-- ====================================================
+                 MAIN BODY — four columns
+                 columns 2 + 3 form a visually merged central panel
+                 ==================================================== -->
+            <div class="body">
+
+                <span class="midrule" aria-hidden="true"></span>
+
+                <!-- =========================================
+                     COLUMN 1 — The clinical genetics gap
+                     ========================================= -->
+                <div class="col">
+
+                    <section class="card">
+                        <h2 class="section-h"><span>The clinical genetics gap.</span><span class="ix">01 · Why now</span></h2>
+                        <p class="lede">
+                            The literature already contains the answer. The chart already contains the
+                            question. The omics already exists. <em>None of them talk to each other.</em>
+                        </p>
+                        <p>
+                            Thousands of published case reports describe variant-to-phenotype
+                            relationships in exquisite detail. The patient&rsquo;s chart already holds the
+                            phenotype, growth curves, family history, and prior testing.
+                            Single-cell genomics has produced an enormous evidence base for what
+                            variants <em>do</em> to cells.
+                        </p>
+                        <p>
+                            But the literature is locked in PDFs. The chart is locked in EHR systems.
+                            The omics is locked in nine incompatible file formats spread across a
+                            dozen pipelines. Every clinical AI project starts by building the same
+                            plumbing twice.
+                        </p>
+                    </section>
+
+                    <section class="card">
+                        <div class="vignette" style="border-left-color: var(--accent); margin-top: 0.06in;">
+                            <div class="vh">Design principle</div>
+                            <div class="ask" style="font-size:21px;">
+                                &ldquo;The chart already contains the diagnosis. Our job is to make sure the
+                                model has read enough literature to recognize it &mdash; and the right
+                                omics to confirm it.&rdquo;
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="card">
+                        <h2 class="section-h"><span>From cells to clinic.</span><span class="ix">02 · Bridge</span></h2>
+                        <p>
+                            Harmonization is the prerequisite for clinical intelligence. The same
+                            architecture that scales <i>up</i> to a billion research cells must scale
+                            <i>down</i> to a single patient&rsquo;s chart. When every input parses the same
+                            way, the model can finally reason about <em>phenotype</em> rather than file
+                            format.
+                        </p>
+                        <p>
+                            That is the bridge: research-grade harmonization, clinic-grade reasoning.
+                            Every layer of the framework in the central panel sits on the substrate
+                            described to the right.
+                        </p>
+                    </section>
+
+                </div>
+
+                <!-- =========================================
+                     COLUMN 2 — Framework (left half of merged center)
+                     ========================================= -->
+                <div class="col">
+
+                    <section class="card">
+                        <h2 class="section-h"><span>A framework for clinical genetics AI.</span><span class="ix">03 · Framework</span></h2>
+                        <p class="lede">
+                            Most clinical AI starts with the genome and tries to <em>predict</em> the
+                            phenotype. We invert that. Start with the literature; let case reports
+                            teach the model what a phenotype <em>looks like</em>; only then read the
+                            omics.
+                        </p>
+
+                        <div class="framework">
+
+                            <div class="layer foundation">
+                                <div class="ix">L1</div>
+                                <div>
+                                    <h4>Phenotype foundation &mdash; learned from the literature</h4>
+                                    <p>Pre-train on every published clinical genetics case report.
+                                        The model learns what a Loeys&ndash;Dietz looks like, what a
+                                        22q11.2 deletion presents like, what the natural history of
+                                        an ASXL3 variant <em>actually is</em> &mdash; from thousands of
+                                        phenotyped patients. A contrastive embedding space replaces
+                                        brittle HPO classification.</p>
+                                </div>
+                            </div>
+
+                            <div class="arrow">&darr;</div>
+
+                            <div class="layer">
+                                <div class="ix">L2</div>
+                                <div>
+                                    <h4>Patient context &mdash; the chart, structured</h4>
+                                    <p>HPO terms, growth curves, imaging, prior tests, family
+                                        history, clinical notes. Assembled from the EHR into a single
+                                        case-report-shaped input the L1 model already knows how to
+                                        read.</p>
+                                </div>
+                            </div>
+
+                            <div class="arrow">&darr;</div>
+
+                            <div class="layer">
+                                <div class="ix">L3</div>
+                                <div>
+                                    <h4>Omics as evidence &mdash; not as the question</h4>
+                                    <p>Variants, expression, methylation, splicing, single-cell
+                                        programs &mdash; supplied as retrieval context, weighted by what
+                                        the literature says matters for <em>this</em> phenotype.
+                                        Inference chain:
+                                        <span class="mono">variant &rarr; cis-effect &rarr; NMF
+                                            program &rarr; cell state &rarr; phenotype</span>.</p>
+                                </div>
+                            </div>
+
+                            <div class="arrow">&darr;</div>
+
+                            <div class="layer">
+                                <div class="ix">L4</div>
+                                <div>
+                                    <h4>Answer &mdash; consistent with the case-report record</h4>
+                                    <p>Every claim cites a paper, a chart finding, or a variant.
+                                        The output reads like a differential a colleague would
+                                        write, not a confidence score. Mechanistic, not
+                                        embedding-distance.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                </div>
+
+                <!-- =========================================
+                     COLUMN 3 — Validation + worked example (right half of merged center)
+                     ========================================= -->
+                <div class="col">
+
+                    <section class="card">
+                        <h2 class="section-h"><span>Validation &mdash; 13 disease variants, end to end.</span><span class="ix">04 · Evidence</span></h2>
+
+                        <div class="results-card">
+                            <div class="results-head">
+                                <h3>Genotype &rarr; phenotype proof-of-concept</h3>
+                                <span class="tag">BMMC · 69k cells · ~70 s · 1 CPU</span>
+                            </div>
+
+                            <div class="results-metrics">
+                                <div class="m">
+                                    <div class="mn">0.933</div>
+                                    <div class="ml">Mean F<sub>1</sub></div>
+                                </div>
+                                <div class="m">
+                                    <div class="mn">0.929</div>
+                                    <div class="ml">Precision</div>
+                                </div>
+                                <div class="m">
+                                    <div class="mn">0.962</div>
+                                    <div class="ml">Recall</div>
+                                </div>
+                                <div class="m">
+                                    <div class="mn">0.947</div>
+                                    <div class="ml">Held-out F<sub>1</sub></div>
+                                </div>
+                            </div>
+
+                            <div class="results-list">
+                                <p style="font-size:16px; line-height:1.5; margin:0;">
+                                    Held-out cohort: <b>8 of 10 variants at perfect F<sub>1</sub></b>;
+                                    held-out generalizes <em>better</em> than the dev split (gap = &minus;0.06).
+                                    Conditions correctly predicted include
+                                    <b>Sickle cell disease</b> (HBB E6V),
+                                    <b>Diamond&ndash;Blackfan anemia</b> (RPS19 LoF),
+                                    <b>Wiskott&ndash;Aldrich syndrome</b> (WAS),
+                                    <b>X-linked agammaglobulinemia</b> (BTK),
+                                    <b>Familial HLH</b> (PRF1),
+                                    <b>severe congenital neutropenia</b> (ELANE),
+                                    <b>JAK2-V617F MPN</b>,
+                                    <b>FLT3-ITD AML</b>,
+                                    and <b>GATA1-related cytopenias</b>.
+                                </p>
+                                <p class="meta-text" style="margin-top:0.10in;">
+                                    Literature priors: <b>1,243 claims from 1,147 articles across 24
+                                        genes</b> (PubMed-derived). Confidence-scaled penalty &mdash; genes
+                                    with &gt;30 published claims receive stricter evidentiary weighting.
+                                </p>
+
+                                <!-- Per-variant F1 horizontal bar chart -->
+                                <div class="f1-plot">
+                                    <svg viewBox="0 0 600 360" preserveAspectRatio="xMidYMid meet" role="img" aria-labelledby="f1-title">
+                                        <title id="f1-title">F1 score per disease variant</title>
+                                        <!-- gridlines + ticks -->
+                                        <g font-family="JetBrains Mono, monospace" font-size="11" fill="#5C6470">
+                                            <line x1="210" x2="210" y1="38" y2="318" stroke="#C2C7CF" stroke-width="1" />
+                                            <line x1="302.5" x2="302.5" y1="38" y2="318" stroke="#E2E5EA" stroke-dasharray="2 4" />
+                                            <line x1="395" x2="395" y1="38" y2="318" stroke="#E2E5EA" stroke-dasharray="2 4" />
+                                            <line x1="487.5" x2="487.5" y1="38" y2="318" stroke="#E2E5EA" stroke-dasharray="2 4" />
+                                            <line x1="580" x2="580" y1="38" y2="318" stroke="#C2C7CF" stroke-width="1" />
+                                            <text x="210" y="334" text-anchor="middle">0</text>
+                                            <text x="302.5" y="334" text-anchor="middle">0.25</text>
+                                            <text x="395" y="334" text-anchor="middle">0.5</text>
+                                            <text x="487.5" y="334" text-anchor="middle">0.75</text>
+                                            <text x="580" y="334" text-anchor="middle">1.0</text>
+                                            <text x="395" y="354" text-anchor="middle" font-size="12" fill="#5C6470">F&#8321; score</text>
+                                        </g>
+                                        <!-- Mean reference line at 0.933 -->
+                                        <line x1="555.2" x2="555.2" y1="38" y2="318" stroke="#0B6E83" stroke-width="1.4" stroke-dasharray="4 4" />
+                                        <text x="555.2" y="30" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="11" fill="#0B6E83" font-weight="600">mean F&#8321; = 0.933</text>
+
+                                        <!-- 13 bars; perfect (1.00) in accent-deep, ≥0.90 in accent, &lt;0.90 in accent-ink at lower opacity -->
+                                        <!-- Row spacing: 21px from y=40, label x=200 anchor=end -->
+                                        <g font-family="Inter, sans-serif" font-size="12" fill="#2A2F36">
+                                            <text x="200" y="54" text-anchor="end">Sickle cell · HBB E6V</text>
+                                            <rect x="210" y="44" height="14" width="370" fill="#084C5C" />
+                                            <text x="586" y="54" font-family="JetBrains Mono, monospace" font-size="11" fill="#0F1419" font-weight="700">1.00</text>
+
+                                            <text x="200" y="75" text-anchor="end">Diamond–Blackfan · RPS19</text>
+                                            <rect x="210" y="65" height="14" width="370" fill="#084C5C" />
+                                            <text x="586" y="75" font-family="JetBrains Mono, monospace" font-size="11" fill="#0F1419" font-weight="700">1.00</text>
+
+                                            <text x="200" y="96" text-anchor="end">Wiskott–Aldrich · WAS</text>
+                                            <rect x="210" y="86" height="14" width="370" fill="#084C5C" />
+                                            <text x="586" y="96" font-family="JetBrains Mono, monospace" font-size="11" fill="#0F1419" font-weight="700">1.00</text>
+
+                                            <text x="200" y="117" text-anchor="end">X-linked agamma. · BTK</text>
+                                            <rect x="210" y="107" height="14" width="370" fill="#084C5C" />
+                                            <text x="586" y="117" font-family="JetBrains Mono, monospace" font-size="11" fill="#0F1419" font-weight="700">1.00</text>
+
+                                            <text x="200" y="138" text-anchor="end">Familial HLH · PRF1</text>
+                                            <rect x="210" y="128" height="14" width="370" fill="#084C5C" />
+                                            <text x="586" y="138" font-family="JetBrains Mono, monospace" font-size="11" fill="#0F1419" font-weight="700">1.00</text>
+
+                                            <text x="200" y="159" text-anchor="end">JAK2-V617F MPN</text>
+                                            <rect x="210" y="149" height="14" width="370" fill="#084C5C" />
+                                            <text x="586" y="159" font-family="JetBrains Mono, monospace" font-size="11" fill="#0F1419" font-weight="700">1.00</text>
+
+                                            <text x="200" y="180" text-anchor="end">FLT3-ITD AML</text>
+                                            <rect x="210" y="170" height="14" width="370" fill="#084C5C" />
+                                            <text x="586" y="180" font-family="JetBrains Mono, monospace" font-size="11" fill="#0F1419" font-weight="700">1.00</text>
+
+                                            <text x="200" y="201" text-anchor="end">Severe cong. neutropenia · ELANE</text>
+                                            <rect x="210" y="191" height="14" width="344.1" fill="#0EA5C2" />
+                                            <text x="560.1" y="201" font-family="JetBrains Mono, monospace" font-size="11" fill="#0F1419" font-weight="700">0.93</text>
+
+                                            <text x="200" y="222" text-anchor="end">CALR MPN</text>
+                                            <rect x="210" y="212" height="14" width="340.4" fill="#0EA5C2" />
+                                            <text x="556.4" y="222" font-family="JetBrains Mono, monospace" font-size="11" fill="#0F1419" font-weight="700">0.92</text>
+
+                                            <text x="200" y="243" text-anchor="end">SF3B1 MDS</text>
+                                            <rect x="210" y="233" height="14" width="325.6" fill="#0EA5C2" opacity="0.85" />
+                                            <text x="541.6" y="243" font-family="JetBrains Mono, monospace" font-size="11" fill="#0F1419" font-weight="700">0.88</text>
+
+                                            <text x="200" y="264" text-anchor="end">GATA1 cytopenias</text>
+                                            <rect x="210" y="254" height="14" width="314.5" fill="#0EA5C2" opacity="0.7" />
+                                            <text x="530.5" y="264" font-family="JetBrains Mono, monospace" font-size="11" fill="#0F1419" font-weight="700">0.85</text>
+
+                                            <text x="200" y="285" text-anchor="end">DNMT3A AML</text>
+                                            <rect x="210" y="275" height="14" width="292.3" fill="#0EA5C2" opacity="0.55" />
+                                            <text x="508.3" y="285" font-family="JetBrains Mono, monospace" font-size="11" fill="#5C6470" font-weight="700">0.79</text>
+
+                                            <text x="200" y="306" text-anchor="end">TET2 CHIP</text>
+                                            <rect x="210" y="296" height="14" width="281.2" fill="#0EA5C2" opacity="0.5" />
+                                            <text x="497.2" y="306" font-family="JetBrains Mono, monospace" font-size="11" fill="#5C6470" font-weight="700">0.76</text>
+                                        </g>
+                                    </svg>
+                                    <p class="f1-plot-cap">
+                                        Per-variant F&#8321; on BMMC (69k cells). 7 of 13 conditions at perfect F&#8321;; tail performance tracks number of published case reports per gene.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="card">
+                        <div class="vignette">
+                            <div class="vh">Worked example · KCNQ1 variant of uncertain significance</div>
+                            <div class="ask">
+                                &ldquo;My patient has a novel variant in KCNQ1 &mdash; what should I expect?&rdquo;
+                            </div>
+                            <div class="ans">
+                                <b>Answer.</b> This variant disrupts a <b>repolarization program</b>
+                                active in ventricular cardiomyocytes and Purkinje fibers, with
+                                predicted effects on action-potential duration consistent with
+                                <b>Long QT Syndrome Type 1</b>. Similar perturbation signatures
+                                observed in <b>14 published single-cell datasets</b> and
+                                <b>7 case reports</b>. <em>Suggested workup:</em> baseline ECG with
+                                corrected QT, exercise stress test, family history of
+                                syncope/sudden cardiac death, cardiology referral for consideration
+                                of beta-blocker therapy. <em>Confidence: HIGH.</em>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="card">
+                        <div class="vignette" style="border-left-color: var(--accent-deep);">
+                            <div class="vh">Worked example · BMP-pathway craniofacial variant</div>
+                            <div class="ans" style="border-top:none; padding-top:0;">
+                                Variant predicted to disrupt a <b>BMP-pathway program</b> active in
+                                cranial neural crest. <em>Suggested workup:</em> 3D CT craniofacial,
+                                <b>echocardiogram</b> &mdash; BMP-pathway variants associated with cardiac
+                                septal defects in <b>23%</b> of cases. Evidence: <b>14 supporting
+                                    single-cell datasets, 7 published case reports</b>.
+                                <em>Confidence: HIGH.</em>
+                            </div>
+                        </div>
+                    </section>
+
+                </div>
+
+                <!-- =========================================
+                     COLUMN 4 — Substrate + Translation (Herd)
+                     ========================================= -->
+                <div class="col">
+
+                    <section class="card">
+                        <h2 class="section-h"><span>Substrate &mdash; the singlet stack.</span><span class="ix">05 · Foundation</span></h2>
+                        <p class="lede">
+                            One harmonized atlas. One interface. <em>singlet</em> &mdash; a streaming
+                            aligner, a GPU-native quantifier, and a single-output count store.
+                        </p>
+
+                        <div class="subway" aria-hidden="true">
+                            <div class="station"><div class="pip"></div><div class="lbl">Raw</div></div>
+                            <div class="seg"></div>
+                            <div class="station"><div class="pip"></div><div class="lbl">Align</div></div>
+                            <div class="seg"></div>
+                            <div class="station"><div class="pip"></div><div class="lbl">Count</div></div>
+                            <div class="seg"></div>
+                            <div class="station"><div class="pip"></div><div class="lbl">Store</div></div>
+                            <div class="seg"></div>
+                            <div class="station"><div class="pip"></div><div class="lbl">Model</div></div>
+                            <div class="seg"></div>
+                            <div class="station"><div class="pip"></div><div class="lbl">Insight</div></div>
+                        </div>
+
+                        <div class="micro-grid" style="grid-template-columns: 1fr 1fr;">
+                            <div class="micro">
+                                <div class="lab">Input · .1fq</div>
+                                <div class="v">24<span class="u">%</span></div>
+                                <div class="ctx">smaller than FASTQ.gz; aligner streams without
+                                    decompressing.</div>
+                            </div>
+                            <div class="micro">
+                                <div class="lab">One alignment</div>
+                                <div class="v">15<span class="u">% faster</span></div>
+                                <div class="ctx">than STARsolo; 6 signals (gene, intron, splice,
+                                    variants, QC) in one pass.</div>
+                            </div>
+                            <div class="micro">
+                                <div class="lab">Output · .1pz</div>
+                                <div class="v">3.5<span class="u">×</span></div>
+                                <div class="ctx">smaller than MTX.gz across 3,309 studies; loads at
+                                    compute speed.</div>
+                            </div>
+                            <div class="micro">
+                                <div class="lab">Wall-clock</div>
+                                <div class="v">25<span class="u">% saved</span></div>
+                                <div class="ctx">on a 30 GB single-cell run (n=8): 60 min &rarr; 35 min.</div>
+                            </div>
+                            <div class="micro">
+                                <div class="lab">GPU peak</div>
+                                <div class="v">12,600<span class="u">×</span></div>
+                                <div class="ctx">HVG (Pearson) over the CPU reference; same numerical answer.</div>
+                            </div>
+                            <div class="micro">
+                                <div class="lab">Codebase</div>
+                                <div class="v">650<span class="u">&nbsp;modules</span></div>
+                                <div class="ctx">across 7 repos &mdash; same answers as scanpy / Seurat / edgeR, no framework hops.</div>
+                            </div>
+                        </div>
+
+                        <h3 style="margin-top:0.16in;">Corpus &mdash; the largest harmonized single-cell atlas built to date</h3>
+
+                        <div class="corpus">
+                            <div class="clbl">Human Cell Atlas</div>
+                            <div class="cbar hca" style="width:5%"></div>
+                            <div class="cnum">50 M</div>
+
+                            <div class="clbl">CELLxGENE</div>
+                            <div class="cbar cxg" style="width:11%"></div>
+                            <div class="cnum">120 M</div>
+
+                            <div class="clbl">singlet (today)</div>
+                            <div class="cbar now" style="width:33%"></div>
+                            <div class="cnum accent">354 M</div>
+
+                            <div class="clbl">singlet (projected)</div>
+                            <div class="cbar proj" style="width:100%"></div>
+                            <div class="cnum accent">1.06 B</div>
+                        </div>
+
+                        <p class="meta-text" style="margin-top:0.08in;">
+                            <b>3,309 studies</b> harmonized · <b>6,628 to go</b> · gene + intron +
+                            splice-junction + mitochondrial-variant layers side by side.
+                            <b>3&times; CELLxGENE · 20&times; HCA</b>.
+                        </p>
+                    </section>
+
+                    <section class="card">
+                        <h2 class="section-h"><span>Translation &mdash; Herd Social.</span><span class="ix">06 · Clinic</span></h2>
+
+                        <div class="herd-mark">
+                            <img src="assets/herd.svg" alt="Herd Social" />
+                            <span class="tag">HIPAA-compliant<br />clinical genetics<br />literature access</span>
+                        </div>
+
+                        <ul class="feat-list">
+                            <li>
+                                <span class="num">01</span>
+                                <div>
+                                    <h4>Literature, queryable.</h4>
+                                    <p>Every published clinical genetics case report, indexed and
+                                        searchable by phenotype, variant, gene, or syndrome &mdash;
+                                        with citations preserved end to end. The corpus that
+                                        trains L1, exposed at the chair-side.</p>
+                                </div>
+                            </li>
+                            <li>
+                                <span class="num">02</span>
+                                <div>
+                                    <h4>Chart-to-case-report. <span class="badge">Roadmap</span></h4>
+                                    <p>Drop in a chart; receive a structured case-report draft &mdash;
+                                        HPO terms, growth percentiles, prior testing, and a
+                                        differential grounded in the published record. Re-uses the
+                                        same evidence chain that delivered F<sub>1</sub>&nbsp;0.933
+                                        on the genotype-phenotype benchmark.</p>
+                                </div>
+                            </li>
+                            <li>
+                                <span class="num">03</span>
+                                <div>
+                                    <h4>HIPAA-native, geneticist-built. <span class="badge">Roadmap</span></h4>
+                                    <p>BAA-covered infrastructure. No PHI ever leaves the
+                                        clinician&rsquo;s control; OCR and de-identification run inside
+                                        the customer boundary. Built with input from practicing
+                                        clinical geneticists.</p>
+                                </div>
+                            </li>
+                        </ul>
+
+                        <div class="report" aria-label="Sample Herd Social case report">
+                            <div class="frame">
+                                <p class="mock-sub">Herd Social &middot; Case Report &middot; Confidential</p>
+                                <p class="mock-h">Patient: pediatric proband, 7 yr<br />Indication:
+                                    dysmorphology + global developmental delay</p>
+                                <div class="mock-section">
+                                    <span class="h">Phenotype (HPO)</span>
+                                    <div class="mock-line l"></div>
+                                    <div class="mock-line m"></div>
+                                    <div class="mock-line s"></div>
+                                </div>
+                                <div class="mock-section">
+                                    <span class="h">Differential &middot; literature-grounded</span>
+                                    <div class="mock-line l"></div>
+                                    <div class="mock-line m"></div>
+                                    <div class="mock-line l"></div>
+                                </div>
+                                <div class="mock-section">
+                                    <span class="h">Suggested next steps</span>
+                                    <div class="mock-line m"></div>
+                                </div>
+                                <p class="placeholder-note">replace with real screenshot ·
+                                    assets/report.png</p>
+                            </div>
+                        </div>
+                        <p class="report-cap">
+                            Sample case report assembled by Herd Social from a real pediatric chart
+                            (proband: author&rsquo;s son; details redacted). Full PDF on request.
+                        </p>
+                    </section>
+
+                </div>
+
+            </div>
+
+            <!-- ====================================================
+                 CALL TO ACTION
+                 ==================================================== -->
+            <div class="cta">
+                <div class="msg">
+                    The substrate is built. The framework is validated.
+                    <em>Now we make it answer the questions a clinical geneticist actually asks.</em>
+                </div>
+                <div class="contact">
+                    <b>Zach DeBruine, PhD</b>
+                    debruinz@gvsu.edu<br />
+                    debruine.dev &middot; herd.social<br />
+                    GVSU Bioinformatics
+                </div>
+            </div>
+
+            <!-- ====================================================
+                 FOOTER
+                 ==================================================== -->
+            <footer class="foot">
+                <div class="ack">
+                    <b>Acknowledgements</b>
+                    Caleb P. Bupp, MD (Corewell Health) for hosting the conference and for years
+                    of clinical-genetics intuition that shaped this framework.
+                    Surender Rajasekaran (Corewell Health), Andrew Pospisilik and Tim Triche (Van Andel
+                    Institute) for collaboration.
+                    GVSU Applied Computing &amp; Informatics Institute.
+                    Funded in part by NIH/NIGMS R35GM160055 and the Chan&ndash;Zuckerberg Initiative.
+                    Patients and families whose published case reports make this work possible.
+                </div>
+                <div class="logos">
+                    <img class="gv" src="assets/gvsu.jpg" alt="Grand Valley State University" />
+                    <img src="assets/corewell-trim.png" alt="Corewell Health" />
+                    <img class="herd" src="assets/herd.svg" alt="Herd Social" />
+                </div>
+            </footer>
+        </article>
+    </div>
+
+    <script>
+        // ---------------------------------------------------------------
+        // Auto-fit the poster to the viewport. The .stage wrapper occupies
+        // the *scaled* visual area so scrollbars match what the user sees;
+        // the .poster inside is the true 48” × 36” landscape print artifact,
+        // scaled down via CSS transform.
+        // ---------------------------------------------------------------
+        (function fit() {
+            const root = document.documentElement;
+            // Real print pixel dimensions at 96 dpi:
+            const PRINT_W = 48 * 96;  // 4608
+            const PRINT_H = 36 * 96;  // 3456
+            function apply() {
+                const margin = 24;
+                const availW = Math.max(
+                    window.innerWidth || 0,
+                    document.documentElement.clientWidth || 0,
+                    800
+                ) - margin * 2;
+                const availH = Math.max(
+                    window.innerHeight || 0,
+                    document.documentElement.clientHeight || 0,
+                    600
+                ) - margin * 2;
+                let s = Math.min(availW / PRINT_W, availH / PRINT_H);
+                // Clamp to a reasonable on-screen range so a small
+                // measurement never collapses the poster to a thumbnail.
+                s = Math.max(0.20, Math.min(s, 1));
+                root.style.setProperty('--scale', s.toFixed(4));
+            }
+            apply();
+            window.addEventListener('resize', apply);
+        })();
+    </script>
+</body>
+
+</html>

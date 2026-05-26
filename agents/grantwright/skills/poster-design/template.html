@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{ meta.title_plain }}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,wght@0,400;0,500;0,600;1,400;1,500&display=swap"
+        rel="stylesheet" />
+    <style>
+/* === BEGIN styles.css (inlined by build.py) === */
+{{ STYLES_CSS }}
+/* === END styles.css === */
+    </style>
+</head>
+<body>
+<div class="stage">
+<div class="poster">
+
+    <!-- =============================================================
+         HEADER (component 01)
+         ============================================================= -->
+    {{ COMPONENT_HEADER }}
+
+    <!-- =============================================================
+         HERO STATS (component 02)
+         ============================================================= -->
+    {{ COMPONENT_HERO_STATS }}
+
+    <!-- =============================================================
+         OPTIONAL PROBLEM BAND (one full-width section + pull quote)
+         ============================================================= -->
+    {{ COMPONENT_PROBLEM }}
+
+    <!-- =============================================================
+         FOUR-COLUMN BODY (loops columns[].sections[])
+         ============================================================= -->
+    <div class="body">
+        <div class="midrule"></div>
+{{ COMPONENT_BODY_COLUMNS }}
+    </div>
+
+    <!-- =============================================================
+         CTA BAND (component 13)
+         ============================================================= -->
+    {{ COMPONENT_CTA }}
+
+    <!-- =============================================================
+         FOOTER (component 14)
+         ============================================================= -->
+    {{ COMPONENT_FOOTER }}
+
+</div></div>
+
+<script>
+/* === BEGIN scale.js (inlined by build.py) === */
+{{ SCALE_JS }}
+/* === END scale.js === */
+</script>
+</body>
+</html>

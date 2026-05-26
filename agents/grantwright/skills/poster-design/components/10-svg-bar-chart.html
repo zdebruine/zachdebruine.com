@@ -1,0 +1,38 @@
+<!--
+  COMPONENT 10 — SVG BAR CHART (per-item scores)
+  =================================================================
+  Inline SVG horizontal bar chart for showing per-variant scores, etc.
+  Render is fully deterministic from the rows[] array.
+
+  Content fields (chart: kind=svg_bars):
+    title        — string (becomes <title> for a11y)
+    x_axis_label — string ("F1 score")
+    x_max        — number (defaults to 1.0)
+    mean         — number; if set, draws a dashed vertical line + label
+    rows[]:
+      label      — string (left text)
+      value      — float in [0, x_max]
+      weight     — one of: "perfect" (var(--accent-deep), label fully ink)
+                          "strong"  (var(--accent), label ink)
+                          "med"     (var(--accent) 70% opacity)
+                          "weak"    (var(--accent) 50% opacity, label muted)
+
+  Visual rules:
+    - SVG viewBox 600 × 360, preserveAspectRatio="xMidYMid meet".
+    - Label column ends at x=200, bar starts at x=210, bar ends at x=580.
+    - Row spacing: 21px from y=44.
+    - Dashed gridlines at 0.25, 0.5, 0.75 (var(--rule), 2 4 dasharray).
+    - Mean line: var(--accent-ink), 1.4px, dasharray 4 4, label at y=30.
+
+  The build script generates the SVG markup deterministically from rows.
+-->
+<div class="f1-plot">
+    <svg viewBox="0 0 600 360" preserveAspectRatio="xMidYMid meet" role="img">
+        <title>{{ section.chart.title }}</title>
+        <!-- Build script emits gridlines, mean line, bars + value labels here -->
+        {{ rendered_svg_bars }}
+    </svg>
+    {% if section.chart.caption_html %}
+    <p class="f1-plot-cap">{{ section.chart.caption_html }}</p>
+    {% endif %}
+</div>

@@ -1,0 +1,19 @@
+<!--
+  COMPONENT 13 — CALL-TO-ACTION BAND
+  =================================================================
+  The closing rhetorical line + the contact block. Always near the
+  bottom of the poster, just above the footer.
+
+  Content fields:
+    cta.message_html   — single Newsreader sentence; <em> for the punch phrase
+    cta.contact_html   — JetBrains Mono block; <b> for the name
+
+  Visual rules:
+    - Border-top: 2px solid var(--ink). Border-bottom: 1px var(--rule-strong).
+    - Message: Newsreader 30px, max-width 22in.
+    - Contact: JetBrains Mono 16px, right-aligned, min-width 7.5in.
+-->
+<div class="cta">
+    <div class="msg">{{ cta.message_html }}</div>
+    <div class="contact">{{ cta.contact_html }}</div>
+</div>

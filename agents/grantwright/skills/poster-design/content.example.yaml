@@ -1,0 +1,157 @@
+# Example content for the Clinical Intelligence poster.
+# Render with:  python build.py content.example.yaml -o poster.html
+# This produces a poster that demonstrates every section kind.
+
+meta:
+  title_plain: "Clinical Intelligence — A framework for phenotype-grounded AI in clinical genetics"
+  kicker: "Clinical Intelligence · A Framework"
+  title_html: 'A framework for <em>phenotype-grounded</em><br/>AI in clinical genetics.'
+  deck: "Moving beyond ACMG checklists: how single-cell evidence at population scale turns variants of uncertain significance into clinical confidence."
+  authors_html: "Zachary J. DeBruine, PhD"
+  affiliation_html: "Applied Computing Institute · Grand Valley State University"
+  venue_name_html: "Michigan Clinical<br/>Genetics Conference 2026"
+  venue_date: "May 1, 2026"
+  venue_location_html: "Corewell Health · Grand Rapids, MI"
+  venue_host_html: "Hosted by the Corewell Health Genomics Program"
+
+hero_stats:
+  - number: "40–60"
+    unit: "%"
+    label_html: "of variants returned to clinic are <b>variants of uncertain significance</b>"
+  - number: "5–7"
+    unit: " yr"
+    label_html: "typical <b>diagnostic odyssey</b> for rare-disease patients"
+  - number: "1"
+    unit: " in 10"
+    label_html: "patients receive a <b>definitive molecular answer</b> on first pass"
+  - number: "2.17"
+    unit: " PB"
+    label_html: "single-cell <b>RNA-seq</b> publicly accessible — and growing"
+
+problem:
+  heading: "The clinical genetics gap."
+  index: "00 · Why this matters"
+  body_html:
+    - "ACMG criteria were built for a pre-omic world. They reward what is known and penalize ambiguity — turning most novel variants into <b>VUS</b> by design."
+    - "Meanwhile, single-cell RNA-seq has become the most information-dense readout of human cellular state we have ever produced. <em>That signal is sitting on a shelf.</em>"
+  pull:
+    quote_html: 'A variant is only "uncertain" until the right cell type is asked the right question.'
+    cite_html: "— design principle"
+
+columns:
+  - sections:
+      - kind: card
+        heading: "The clinical genetics gap."
+        index: "01 · Why now"
+        lede_html: "Today's pipelines stop at the variant. <em>Tomorrow's must reach the cell.</em>"
+        body_html:
+          - "Population-scale single-cell atlases let us ask: <b>in which cell types is this gene expressed, and what does perturbing it do to that cell's program?</b>"
+          - "We propose a four-layer framework — <span class='mono'>L1–L4</span> — that turns those answers into clinical evidence."
+
+      - kind: subway
+        stations: ["Raw", "Align", "Count", "Store", "Model", "Insight"]
+
+      - kind: micro_grid
+        cols: 3
+        cells:
+          - { label: "Input · .1fq", value: "24", unit: "%", ctx_html: "compressed FASTQ; lossless 2-bit pack" }
+          - { label: "Output · .1pz", value: "8", unit: "×", ctx_html: "smaller than .h5ad on disk" }
+          - { label: "Speed", value: "70", unit: " s", ctx_html: "BMMC · 69k cells · 1 CPU" }
+
+  - sections:
+      - kind: framework
+        heading: "The framework."
+        index: "02 · L1 → L4"
+        lede_html: "Each layer constrains the next; <em>foundation must be unimpeachable.</em>"
+        layers:
+          - id: "L1"
+            foundation: true
+            title: "Reproducible quantification"
+            body_html: "A single binary — <span class='mono'>singlify</span> — produces the same counts on the same FASTQs, forever. No hidden state, no remote dependencies."
+          - id: "L2"
+            foundation: false
+            title: "Population-scale reference"
+            body_html: "56 K samples reprocessed under one model; <b>billions of cells</b> on a shared coordinate system."
+          - id: "L3"
+            foundation: false
+            title: "Cell-type-aware variant interpretation"
+            body_html: "For each variant, score expression and program disruption in the implicated cell type — not the bulk average."
+          - id: "L4"
+            foundation: false
+            title: "Clinical decision support"
+            body_html: "Surface evidence with provenance into the report the geneticist already reads."
+
+      - kind: vignette
+        label_html: "Worked example · KCNQ1 VUS"
+        ask_html: '<em>"A 14-year-old with syncope; KCNQ1 c.1097G>A — predicted benign by REVEL, classified VUS by ACMG."</em>'
+        ans_html: "In cardiomyocyte single-cell programs, the variant maps to a cluster where KCNQ1 disruption recapitulates the Long-QT signature in 89% of carriers. <b>Evidence supports pathogenicity.</b>"
+
+  - sections:
+      - kind: results
+        heading: "Evidence."
+        index: "04 · Validation"
+        title: "Cell-type assignment, held-out cohort"
+        tag: "BMMC · 69k cells · ~70 s · 1 CPU"
+        metrics:
+          - { value: "0.933", label_html: "Mean F<sub>1</sub>" }
+          - { value: "0.94",  label_html: "Precision" }
+          - { value: "0.93",  label_html: "Recall" }
+          - { value: "0.91",  label_html: "Held-out cohort" }
+        narrative_html: "<p>F<sub>1</sub> is reported per cell type against expert annotation. The model generalizes to a held-out PBMC cohort with negligible drift.</p>"
+        chart:
+          kind: svg_bars
+          title: "Per cell-type F1 scores"
+          x_axis_label: "F1 score"
+          x_max: 1.0
+          mean: 0.933
+          rows:
+            - { label: "Naive B", value: 0.99, weight: "perfect" }
+            - { label: "T CD8", value: 0.96, weight: "strong" }
+            - { label: "T CD4", value: 0.95, weight: "strong" }
+            - { label: "Mono",  value: 0.92, weight: "strong" }
+            - { label: "NK",    value: 0.90, weight: "med" }
+            - { label: "B mem", value: 0.88, weight: "med" }
+            - { label: "pDC",   value: 0.71, weight: "weak" }
+
+      - kind: corpus_bars
+        rows:
+          - { label_html: "HCA",            width_pct: 22, number_html: "1.3M cells",  kind: "neutral" }
+          - { label_html: "CellxGene",      width_pct: 38, number_html: "50M cells",   kind: "neutral" }
+          - { label_html: "<b>Singlet now</b>", width_pct: 62, number_html: "56k samples", kind: "now" }
+          - { label_html: "<b>Singlet 2027</b>", width_pct: 100, number_html: "1B+ cells", kind: "projected" }
+
+  - sections:
+      - kind: feat_list
+        items:
+          - num: "01"
+            title_html: "Open binary, open format"
+            body_html: "<span class='mono'>singlify</span> is MIT-licensed; <span class='mono'>.1pz</span> is a documented columnar format."
+          - num: "02"
+            title_html: "Clinician-readable report"
+            badge: "Beta"
+            body_html: "Each variant card surfaces cell-type-conditioned evidence with provenance back to the underlying sample."
+          - num: "03"
+            title_html: "EHR-native integration"
+            badge: "Roadmap"
+            body_html: "FHIR Genomics Reporting profile; pilot in 2026 with Corewell's clinical genomics service."
+
+      - kind: mock_report
+        subhead_html: "Singlet Clinical Report · v0.4 mock"
+        title_html: "KCNQ1 c.1097G>A · cardiomyocyte panel"
+        sections:
+          - { label: "Variant",         lines: [l, m] }
+          - { label: "Cell-type evidence", lines: [l, l, m, s] }
+          - { label: "Recommendation",  lines: [m, s] }
+        placeholder_note: "replace with assets/report.png for production"
+        caption_html: "Mock layout; final design pending pilot feedback."
+
+cta:
+  message_html: "<em>Phenotype-grounded</em> AI doesn't replace the geneticist. It hands them the evidence they were always going to ask for."
+  contact_html: "<b>Zachary J. DeBruine</b><br/>debruinz@gvsu.edu<br/>github.com/zdebruine"
+
+footer:
+  acknowledgments_html: "<em>Funding: Corewell Health Innovation Fund · GVSU Applied Computing Institute · NIH R01-HGxxxxx. Thanks to the Herd Lab and clinical genomics team at Corewell Health.</em>"
+  logos:
+    - { src: "assets/gvsu.jpg",         alt: "Grand Valley State University", height_in: 0.7 }
+    - { src: "assets/herd.svg",         alt: "Herd Lab",                     height_in: 0.6 }
+    - { src: "assets/corewell-trim.png", alt: "Corewell Health",             height_in: 0.65 }

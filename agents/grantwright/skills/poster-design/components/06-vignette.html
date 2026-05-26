@@ -1,0 +1,33 @@
+<!--
+  COMPONENT 06 — VIGNETTE / PULL-QUOTE
+  =================================================================
+  A side-quoted callout: italic Newsreader "ask", optional Inter "ans"
+  below a hairline. Left border in the accent color (or accent-deep for
+  a darker variant).
+
+  Two modes:
+    A) ask + ans  — Q&A worked example (KCNQ1 case)
+    B) ask only   — design-principle pull-quote
+
+  Content fields (section: kind=vignette):
+    label_html      — JetBrains Mono uppercase label ("Worked example · KCNQ1 VUS")
+    ask_html        — italic Newsreader paragraph (the question or claim)
+    ans_html        — optional; the answer/elaboration paragraph
+    accent_variant  — optional: "deep" → use var(--accent-deep) for the border
+
+  Visual rules:
+    - Border: 1px var(--rule-strong) on all sides, plus 4px left border in accent.
+    - Padding: 0.14in 0.20in.
+    - <b> inside .ans renders in var(--accent-deep).
+-->
+<div class="vignette"{% if section.accent_variant == "deep" %} style="border-left-color: var(--accent-deep);"{% endif %}>
+    <div class="vh">{{ section.label_html }}</div>
+    {% if section.ask_html %}
+    <div class="ask">{{ section.ask_html }}</div>
+    {% endif %}
+    {% if section.ans_html %}
+    <div class="ans"{% if not section.ask_html %} style="border-top:none; padding-top:0;"{% endif %}>
+        {{ section.ans_html }}
+    </div>
+    {% endif %}
+</div>
